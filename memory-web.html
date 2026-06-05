@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Memory Web</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  :root{--bg:#0d0d0f;--surface:#161618;--surface2:#1e1e21;--border:rgba(255,255,255,0.07);--text:#e4e4e7;--textmuted:#71717a;--radius:12px}
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;min-height:100dvh;overflow:hidden;-webkit-font-smoothing:antialiased}
+  ::-webkit-scrollbar{width:4px;height:4px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:4px}
+  .chip-base{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:9999px;cursor:pointer;white-space:nowrap;user-select:none;font-size:13px;font-weight:500;border:1px solid transparent;transition:all 150ms ease}
+  .circle-icon-button{padding:0;width:36px;height:36px;justify-content:center;border-radius:9999px}
+  .fab{position:fixed;bottom:28px;right:24px;width:56px;height:56px;border-radius:9999px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.1);color:#fff;font-size:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(12px);box-shadow:0 8px 24px rgba(0,0,0,0.4);transition:all 150ms ease;z-index:50}
+  .fab:hover{background:rgba(255,255,255,0.15);transform:scale(1.04)}
+  .fab:active{transform:scale(0.96)}
+  .sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);z-index:60;animation:fadeIn 200ms ease}
+  .sheet{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);border-radius:20px 20px 0 0;z-index:70;padding:24px;max-height:80dvh;overflow-y:auto;animation:slideUp 250ms cubic-bezier(0.16,1,0.3,1)}
+  .sheet-lg{max-height:90dvh}
+  .side-sheet{position:fixed;top:0;right:0;bottom:0;width:360px;background:var(--surface);border-left:1px solid var(--border);z-index:70;padding:24px;overflow-y:auto;animation:slideRight 250ms cubic-bezier(0.16,1,0.3,1)}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+  @keyframes slideRight{from{transform:translateX(100%)}to{transform:translateX(0)}}
+  @keyframes pulseRing{0%{transform:scale(1);opacity:0.8}50%{transform:scale(1.35);opacity:0.3}100%{transform:scale(1);opacity:0.8}}
+  .input{width:100%;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-size:14px;outline:none;transition:border 150ms}
+  .input:focus{border-color:rgba(255,255,255,0.2)}
+  .input::placeholder{color:var(--textmuted)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 20px;border-radius:10px;font-size:14px;font-weight:500;cursor:pointer;border:none;transition:all 150ms ease}
+  .btn-primary{background:rgba(255,255,255,0.12);color:#fff}
+  .btn-primary:hover{background:rgba(255,255,255,0.18)}
+  .btn-ghost{background:transparent;color:var(--textmuted);border:1px solid var(--border)}
+  .btn-ghost:hover{color:var(--text);border-color:rgba(255,255,255,0.15)}
+  .btn-danger{background:rgba(239,68,68,0.15);color:#f87171}
+  .btn-danger:hover{background:rgba(239,68,68,0.25)}
+  .badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:9999px;font-size:12px;font-weight:500}
+  select.input option{background:var(--surface2);color:var(--text)}
+  canvas{display:block}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+const PRESET_COLORS = ['#6366f1','#ec4899','#f59e0b','#10b981','#3b82f6','#ef4444'];
+
+const INITIAL_CATEGORIES = [
+  {id:'all',label:'Все',color:'#71717a'},
+  {id:'work',label:'Работа',color:'#6366f1'},
+  {id:'personal',label:'Личное',color:'#ec4899'},
+  {id:'ideas',label:'Идеи',color:'#f59e0b'},
+  {id:'travel',label:'Путешествия',color:'#10b981'},
+];
+
+const INITIAL_NODES = [
+  {id:'n1',title:'Запустить проект',text:'Финализировать дизайн и передать разработчикам к концу месяца.',category:'work',date:'2024-01-10',x:null,y:null},
+  {id:'n2',title:'Встреча с командой',text:'Обсудить спринт и приоритеты на неделю.',category:'work',date:'2024-01-12',x:null,y:null},
+  {id:'n3',title:'День рождения мамы',text:'Не забыть купить торт и цветы.',category:'personal',date:'2024-01-15',x:null,y:null},
+  {id:'n4',title:'Прочитать книгу',text:'«Думай медленно, решай быстро» — лежит уже три месяца.',category:'personal',date:'2024-01-08',x:null,y:null},
+  {id:'n5',title:'Приложение для графов',text:'Сделать интерактивный граф заметок как нейросеть.',category:'ideas',date:'2024-01-14',x:null,y:null},
+  {id:'n6',title:'Тёмная тема дизайна',text:'Минимализм + тёмный фон + цветные акценты на категории.',category:'ideas',date:'2024-01-11',x:null,y:null},
+  {id:'n7',title:'Токио',text:'Посетить в сакурный сезон. Арашияма, Симокитадзава, рынок Цукидзи.',category:'travel',date:'2024-01-09',x:null,y:null},
+  {id:'n8',title:'Грузия',text:'Тбилиси и Батуми — горы, вино, архитектура.',category:'travel',date:'2024-01-13',x:null,y:null},
+  {id:'n9',title:'Стенд-ап ежедневно',text:'15 минут в 10:00 — коротко, по делу.',category:'work',date:'2024-01-07',x:null,y:null},
+  {id:'n10',title:'Медитация',text:'Попробовать утренние практики по 10 минут.',category:'personal',date:'2024-01-06',x:null,y:null},
+];
+
+const INITIAL_EDGES = [
+  {id:'e1',source:'n1',target:'n2'},
+  {id:'e2',source:'n1',target:'n9'},
+  {id:'e3',source:'n5',target:'n6'},
+  {id:'e4',source:'n7',target:'n8'},
+  {id:'e5',source:'n3',target:'n4'},
+  {id:'e6',source:'n5',target:'n1'},
+  {id:'e7',source:'n10',target:'n4'},
+];
+
+function edgeKey(a,b){return [a,b].sort().join('__')}
+
+function formatDate(d){
+  if(!d)return'';
+  const dt=new Date(d);
+  return dt.toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'});
+}
+
+function ColorPicker({value,onChange}){
+  return(
+    <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+      {PRESET_COLORS.map(c=>(
+        <div key={c} onClick={()=>onChange(c)}
+          style={{width:28,height:28,borderRadius:'50%',background:c,cursor:'pointer',
+            border:value===c?'2px solid #fff':'2px solid transparent',
+            boxShadow:value===c?`0 0 0 2px ${c}55`:'none',
+            transition:'all 150ms'}}
+        />
+      ))}
+    </div>
+  );
+}
+
+function Chip({active,color,children,onClick}){
+  return(
+    <button className="chip-base" onClick={onClick}
+      style={{
+        background: active ? `color-mix(in srgb, ${color} 70%, rgba(255,255,255,0.1))` : 'rgba(255,255,255,0.05)',
+        border: active ? `1px solid ${color}88` : '1px solid rgba(255,255,255,0.08)',
+        color: active ? '#fff' : '#a1a1aa',
+        boxShadow: active ? `0 0 10px ${color}44` : 'none',
+      }}>
+      {active && <span style={{width:6,height:6,borderRadius:'50%',background:'#fff',opacity:0.8,flexShrink:0}}/>}
+      {children}
+    </button>
+  );
+}
+
+function Graph({nodes,edges,categories,onNodeClick,onCreateEdge,onEdgeClick,selectedEdgeId}){
+  const canvasRef=useRef(null);
+  const stateRef=useRef({
+    pan:{x:0,y:0},scale:1,
+    dragging:null,
+    panning:false,panStart:null,panOrigin:null,
+    longPressTimer:null,longPressNode:null,
+    connectMode:false,connectSource:null,
+    previewLine:null,
+    hoverNode:null,
+    positions:{},
+    newEdgeAnim:null,
+    newEdgeAnimStart:null,
+  });
+  const [tick,setTick]=useState(0);
+  const repaint=useCallback(()=>setTick(t=>t+1),[]);
+
+  const catMap=useMemo(()=>{
+    const m={};categories.forEach(c=>m[c.id]=c);return m;
+  },[categories]);
+
+  const nodeRadius=useCallback((node)=>{
+    const conns=edges.filter(e=>e.source===node.id||e.target===node.id).length;
+    return 18+Math.min(conns,6)*2;
+  },[edges]);
+
+  // Init positions
+  useEffect(()=>{
+    const st=stateRef.current;
+    const canvas=canvasRef.current;
+    if(!canvas)return;
+    const W=canvas.width,H=canvas.height;
+    nodes.forEach((n,i)=>{
+      if(!st.positions[n.id]){
+        const angle=(i/nodes.length)*2*Math.PI;
+        const r=Math.min(W,H)*0.28;
+        st.positions[n.id]={
+          x:W/2+r*Math.cos(angle),
+          y:H/2+r*Math.sin(angle),
+        };
+      }
+    });
+  },[nodes]);
+
+  // Resize
+  useEffect(()=>{
+    const canvas=canvasRef.current;
+    if(!canvas)return;
+    const resize=()=>{
+      canvas.width=canvas.offsetWidth;
+      canvas.height=canvas.offsetHeight;
+      repaint();
+    };
+    resize();
+    const ro=new ResizeObserver(resize);
+    ro.observe(canvas);
+    return()=>ro.disconnect();
+  },[]);
+
+  // Draw
+  useEffect(()=>{
+    const canvas=canvasRef.current;
+    if(!canvas)return;
+    const ctx=canvas.getContext('2d');
+    const st=stateRef.current;
+    const W=canvas.width,H=canvas.height;
+    ctx.clearRect(0,0,W,H);
+    ctx.save();
+    ctx.translate(st.pan.x,st.pan.y);
+    ctx.scale(st.scale,st.scale);
+
+    const getPos=(id)=>st.positions[id]||{x:W/2,y:H/2};
+
+    // Edges
+    edges.forEach(edge=>{
+      const sp=getPos(edge.source);
+      const tp=getPos(edge.target);
+      const isSelected=edge.id===selectedEdgeId;
+      const isNew=st.newEdgeAnim===edge.id;
+      let progress=1;
+      if(isNew&&st.newEdgeAnimStart){
+        progress=Math.min(1,(Date.now()-st.newEdgeAnimStart)/400);
+        if(progress<1)repaint();
+        else st.newEdgeAnim=null;
+      }
+      ctx.save();
+      ctx.strokeStyle=isSelected?'rgba(239,68,68,0.8)':isNew?'rgba(255,255,255,0.5)':'rgba(255,255,255,0.12)';
+      ctx.lineWidth=isSelected?2:1;
+      ctx.globalAlpha=isNew?progress:1;
+      if(isSelected){ctx.shadowColor='rgba(239,68,68,0.4)';ctx.shadowBlur=8;}
+      ctx.beginPath();
+      const mx=sp.x+(tp.x-sp.x)*progress;
+      const my=sp.y+(tp.y-sp.y)*progress;
+      ctx.moveTo(sp.x,sp.y);
+      ctx.lineTo(mx,my);
+      ctx.stroke();
+      ctx.restore();
+    });
+
+    // Preview line
+    if(st.connectMode&&st.previewLine&&st.connectSource){
+      const sp=getPos(st.connectSource);
+      const pl=st.previewLine;
+      ctx.save();
+      ctx.strokeStyle='rgba(99,102,241,0.9)';
+      ctx.lineWidth=2;
+      ctx.setLineDash([6,4]);
+      ctx.shadowColor='rgba(99,102,241,0.6)';
+      ctx.shadowBlur=10;
+      ctx.beginPath();
+      ctx.moveTo(sp.x,sp.y);
+      ctx.lineTo(pl.x,pl.y);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Nodes
+    nodes.forEach(node=>{
+      const pos=getPos(node.id);
+      const r=nodeRadius(node);
+      const cat=catMap[node.category];
+      const color=cat?cat.color:'#71717a';
+      const isHovered=st.hoverNode===node.id;
+      const isConnectSource=st.connectSource===node.id;
+      const isPotentialTarget=st.connectMode&&st.hoverNode===node.id&&st.connectSource!==node.id;
+
+      // Pulse ring for connect source
+      if(isConnectSource&&st.connectMode){
+        const pulse=(Math.sin(Date.now()/300)*0.5+0.5)*0.6+0.2;
+        ctx.save();
+        ctx.strokeStyle=color;
+        ctx.lineWidth=2;
+        ctx.globalAlpha=pulse;
+        ctx.shadowColor=color;
+        ctx.shadowBlur=16;
+        ctx.beginPath();
+        ctx.arc(pos.x,pos.y,r+8,0,Math.PI*2);
+        ctx.stroke();
+        ctx.restore();
+        repaint();
+      }
+
+      // Hover ring for potential target
+      if(isPotentialTarget){
+        ctx.save();
+        ctx.strokeStyle=color;
+        ctx.lineWidth=2;
+        ctx.globalAlpha=0.8;
+        ctx.shadowColor=color;
+        ctx.shadowBlur=20;
+        ctx.beginPath();
+        ctx.arc(pos.x,pos.y,r+6,0,Math.PI*2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Node shadow
+      ctx.save();
+      ctx.shadowColor=color+'66';
+      ctx.shadowBlur=isHovered?20:10;
+      ctx.beginPath();
+      ctx.arc(pos.x,pos.y,r,0,Math.PI*2);
+      ctx.fillStyle=`color-mix(in srgb,${color} 30%,#1a1a1f)`;
+      ctx.fill();
+      ctx.restore();
+
+      // Node border
+      ctx.save();
+      ctx.strokeStyle=isHovered?color:`${color}88`;
+      ctx.lineWidth=isHovered?2:1.5;
+      ctx.beginPath();
+      ctx.arc(pos.x,pos.y,r,0,Math.PI*2);
+      ctx.stroke();
+      ctx.restore();
+
+      // Label
+      ctx.save();
+      ctx.fillStyle='rgba(255,255,255,0.85)';
+      ctx.font=`500 ${Math.max(10,r*0.55)}px Inter,system-ui,sans-serif`;
+      ctx.textAlign='center';
+      ctx.textBaseline='middle';
+      const maxLen=Math.floor(r*1.5/5);
+      let label=node.title.length>maxLen?node.title.slice(0,maxLen)+'…':node.title;
+      ctx.fillText(label,pos.x,pos.y);
+      ctx.restore();
+    });
+
+    ctx.restore();
+  },[nodes,edges,catMap,nodeRadius,selectedEdgeId,tick]);
+
+  const toWorld=useCallback((cx,cy)=>{
+    const st=stateRef.current;
+    return{x:(cx-st.pan.x)/st.scale,y:(cy-st.pan.y)/st.scale};
+  },[]);
+
+  const hitNode=useCallback((wx,wy)=>{
+    const st=stateRef.current;
+    return nodes.find(n=>{
+      const pos=st.positions[n.id];
+      if(!pos)return false;
+      const r=nodeRadius(n)+4;
+      return Math.hypot(pos.x-wx,pos.y-wy)<r;
+    })||null;
+  },[nodes,nodeRadius]);
+
+  const hitEdge=useCallback((wx,wy)=>{
+    const st=stateRef.current;
+    const THRESH=8;
+    return edges.find(edge=>{
+      const sp=st.positions[edge.source];
+      const tp=st.positions[edge.target];
+      if(!sp||!tp)return false;
+      const dx=tp.x-sp.x,dy=tp.y-sp.y;
+      const len=Math.hypot(dx,dy);
+      if(len<1)return false;
+      const t=((wx-sp.x)*dx+(wy-sp.y)*dy)/(len*len);
+      if(t<0||t>1)return false;
+      const px=sp.x+t*dx,py=sp.y+t*dy;
+      return Math.hypot(wx-px,wy-py)<THRESH;
+    })||null;
+  },[edges]);
+
+  const cancelLongPress=useCallback(()=>{
+    const st=stateRef.current;
+    if(st.longPressTimer){clearTimeout(st.longPressTimer);st.longPressTimer=null;}
+  },[]);
+
+  const getEventPos=useCallback((e)=>{
+    const canvas=canvasRef.current;
+    const rect=canvas.getBoundingClientRect();
+    const touch=e.touches?e.touches[0]:e;
+    return{cx:touch.clientX-rect.left,cy:touch.clientY-rect.top};
+  },[]);
+
+  const onPointerDown=useCallback((e)=>{
+    const st=stateRef.current;
+    const{cx,cy}=getEventPos(e);
+    const{x:wx,y:wy}=toWorld(cx,cy);
+    const node=hitNode(wx,wy);
+
+    if(node){
+      cancelLongPress();
+      st.longPressNode=node.id;
+      st.longPressTimer=setTimeout(()=>{
+        st.connectMode=true;
+        st.connectSource=node.id;
+        st.dragging=null;
+        repaint();
+      },500);
+      st.dragging={id:node.id,ox:wx-st.positions[node.id].x,oy:wy-st.positions[node.id].y};
+      st.pointerDownPos={cx,cy};
+      st.pointerMoved=false;
+    } else {
+      st.panning=true;
+      st.panStart={cx,cy};
+      st.panOrigin={...st.pan};
+    }
+  },[hitNode,toWorld,cancelLongPress,repaint]);
+
+  const onPointerMove=useCallback((e)=>{
+    const st=stateRef.current;
+    const{cx,cy}=getEventPos(e);
+    const{x:wx,y:wy}=toWorld(cx,cy);
+
+    if(st.pointerDownPos){
+      const dx=Math.abs(cx-st.pointerDownPos.cx),dy=Math.abs(cy-st.pointerDownPos.cy);
+      if(dx>5||dy>5)st.pointerMoved=true;
+    }
+
+    if(st.connectMode&&st.connectSource){
+      cancelLongPress();
+      st.previewLine={x:wx,y:wy};
+      const hn=hitNode(wx,wy);
+      st.hoverNode=hn?hn.id:null;
+      repaint();
+      return;
+    }
+
+    if(st.dragging){
+      if(st.pointerMoved){
+        cancelLongPress();
+        st.positions[st.dragging.id]={x:wx-st.dragging.ox,y:wy-st.dragging.oy};
+        repaint();
+      }
+      return;
+    }
+
+    if(st.panning&&st.panStart){
+      st.pan={x:st.panOrigin.x+(cx-st.panStart.cx),y:st.panOrigin.y+(cy-st.panStart.cy)};
+      repaint();
+      return;
+    }
+
+    const hn=hitNode(wx,wy);
+    const prev=st.hoverNode;
+    st.hoverNode=hn?hn.id:null;
+    if(prev!==st.hoverNode)repaint();
+  },[toWorld,hitNode,cancelLongPress,repaint]);
+
+  const onPointerUp=useCallback((e)=>{
+    const st=stateRef.current;
+    cancelLongPress();
+    const{cx,cy}=getEventPos(e);
+    const{x:wx,y:wy}=toWorld(cx,cy);
+    const node=hitNode(wx,wy);
+
+    if(st.connectMode&&st.connectSource){
+      if(node&&node.id!==st.connectSource){
+        onCreateEdge(st.connectSource,node.id);
+        const eid='e_'+Date.now();
+        st.newEdgeAnim=eid;
+        st.newEdgeAnimStart=Date.now();
+      }
+      st.connectMode=false;
+      st.connectSource=null;
+      st.previewLine=null;
+      st.hoverNode=null;
+      st.dragging=null;
+      repaint();
+      return;
+    }
+
+    if(st.dragging&&!st.pointerMoved){
+      const{x:wx2,y:wy2}=toWorld(cx,cy);
+      const tappedNode=hitNode(wx2,wy2);
+      if(tappedNode){
+        onNodeClick(tappedNode);
+      } else {
+        const tappedEdge=hitEdge(wx2,wy2);
+        if(tappedEdge)onEdgeClick(tappedEdge);
+      }
+    } else if(!st.dragging&&!st.panning){
+      const tappedEdge=hitEdge(wx,wy);
+      if(tappedEdge)onEdgeClick(tappedEdge);
+    }
+
+    st.dragging=null;
+    st.panning=false;
+    st.panStart=null;
+    st.panOrigin=null;
+    st.pointerDownPos=null;
+    st.pointerMoved=false;
+    repaint();
+  },[hitNode,hitEdge,toWorld,cancelLongPress,onNodeClick,onCreateEdge,onEdgeClick,repaint]);
+
+  const onWheel=useCallback((e)=>{
+    e.preventDefault();
+    const st=stateRef.current;
+    const canvas=canvasRef.current;
+    const rect=canvas.getBoundingClientRect();
+    const cx=e.clientX-rect.left,cy=e.clientY-rect.top;
+    const delta=e.deltaY>0?0.9:1.1;
+    const newScale=Math.max(0.3,Math.min(4,st.scale*delta));
+    st.pan={x:cx-(cx-st.pan.x)*(newScale/st.scale),y:cy-(cy-st.pan.y)*(newScale/st.scale)};
+    st.scale=newScale;
+    repaint();
+  },[repaint]);
+
+  useEffect(()=>{
+    const canvas=canvasRef.current;
+    if(!canvas)return;
+    canvas.addEventListener('wheel',onWheel,{passive:false});
+    return()=>canvas.removeEventListener('wheel',onWheel);
+  },[onWheel]);
+
+  return(
+    <canvas ref={canvasRef}
+      style={{width:'100%',height:'100%',touchAction:'none',cursor:'default'}}
+      onMouseDown={onPointerDown} onMouseMove={onPointerMove} onMouseUp={onPointerUp}
+      onTouchStart={e=>{e.preventDefault();onPointerDown(e);}}
+      onTouchMove={e=>{e.preventDefault();onPointerMove(e);}}
+      onTouchEnd={e=>{e.preventDefault();onPointerUp(e);}}
+    />
+  );
+}
+
+function App(){
+  const [categories,setCategories]=useState(INITIAL_CATEGORIES);
+  const [nodes,setNodes]=useState(INITIAL_NODES);
+  const [edges,setEdges]=useState(INITIAL_EDGES);
+  const [selectedCategories,setSelectedCategories]=useState(['all']);
+  const [selectedEdgeId,setSelectedEdgeId]=useState(null);
+  const [selectedNode,setSelectedNode]=useState(null);
+  const [noteOpen,setNoteOpen]=useState(false);
+  const [addCatOpen,setAddCatOpen]=useState(false);
+  const [addNoteOpen,setAddNoteOpen]=useState(false);
+  const [editOpen,setEditOpen]=useState(false);
+  const [newCatName,setNewCatName]=useState('');
+  const [newCatColor,setNewCatColor]=useState(PRESET_COLORS[0]);
+  const [noteForm,setNoteForm]=useState({title:'',text:'',category:'work',date:''});
+  const [editForm,setEditForm]=useState({title:'',text:'',category:'work',date:''});
+
+  const toggleCategory=useCallback((id)=>{
+    setSelectedCategories(prev=>{
+      if(id==='all')return['all'];
+      const base=prev.filter(x=>x!=='all');
+      const exists=base.includes(id);
+      const next=exists?base.filter(x=>x!==id):[...base,id];
+      return next.length?next:['all'];
+    });
+    setSelectedEdgeId(null);
+    setNoteOpen(false);
+  },[]);
+
+  const visibleIds=useMemo(()=>{
+    const hasSpecific=selectedCategories.some(x=>x!=='all');
+    if(!hasSpecific)return new Set(nodes.map(n=>n.id));
+    const s=new Set(selectedCategories);
+    return new Set(nodes.filter(n=>s.has(n.category)).map(n=>n.id));
+  },[nodes,selectedCategories]);
+
+  const visibleNodes=useMemo(()=>nodes.filter(n=>visibleIds.has(n.id)),[nodes,visibleIds]);
+  const visibleEdges=useMemo(()=>edges.filter(e=>visibleIds.has(e.source)&&visibleIds.has(e.target)),[edges,visibleIds]);
+
+  const handleNodeClick=useCallback((node)=>{
+    setSelectedNode(node);
+    setNoteOpen(true);
+    setSelectedEdgeId(null);
+  },[]);
+
+  const handleEdgeClick=useCallback((edge)=>{
+    setSelectedEdgeId(edge.id);
+    setNoteOpen(false);
+  },[]);
+
+  const handleCreateEdge=useCallback((sourceId,targetId)=>{
+    const key=edgeKey(sourceId,targetId);
+    const exists=edges.some(e=>edgeKey(e.source,e.target)===key);
+    if(exists)return;
+    setEdges(prev=>[...prev,{id:'e_'+Date.now(),source:sourceId,target:targetId}]);
+  },[edges]);
+
+  const handleDeleteEdge=useCallback(()=>{
+    if(!selectedEdgeId)return;
+    setEdges(prev=>prev.filter(e=>e.id!==selectedEdgeId));
+    setSelectedEdgeId(null);
+  },[selectedEdgeId]);
+
+  const handleDeleteNode=useCallback(()=>{
+    if(!selectedNode)return;
+    setNodes(prev=>prev.filter(n=>n.id!==selectedNode.id));
+    setEdges(prev=>prev.filter(e=>e.source!==selectedNode.id&&e.target!==selectedNode.id));
+    setNoteOpen(false);
+    setSelectedNode(null);
+  },[selectedNode]);
+
+  const handleSaveEdit=useCallback(()=>{
+    if(!selectedNode)return;
+    setNodes(prev=>prev.map(n=>n.id===selectedNode.id?{...n,...editForm}:n));
+    setSelectedNode(prev=>prev?{...prev,...editForm}:prev);
+    setEditOpen(false);
+  },[selectedNode,editForm]);
+
+  const handleAddCategory=useCallback(()=>{
+    if(!newCatName.trim())return;
+    const id='cat_'+Date.now();
+    setCategories(prev=>[...prev,{id,label:newCatName.trim(),color:newCatColor}]);
+    setNewCatName('');
+    setNewCatColor(PRESET_COLORS[0]);
+    setAddCatOpen(false);
+  },[newCatName,newCatColor]);
+
+  const handleAddNote=useCallback(()=>{
+    if(!noteForm.title.trim())return;
+    setNodes(prev=>[...prev,{id:'n_'+Date.now(),...noteForm,x:null,y:null}]);
+    setNoteForm({title:'',text:'',category:'work',date:''});
+    setAddNoteOpen(false);
+  },[noteForm]);
+
+  const catMap=useMemo(()=>{const m={};categories.forEach(c=>m[c.id]=c);return m;},[categories]);
+  const isAllActive=!selectedCategories.some(x=>x!=='all');
+
+  const isSideSheet=typeof window!=='undefined'&&window.innerWidth>=1024;
+  const NoteSheet=isSideSheet?'div':'div';
+
+  return(
+    <div style={{display:'flex',flexDirection:'column',height:'100dvh',overflow:'hidden'}}>
+      {/* Top bar */}
+      <div style={{padding:'12px 16px',borderBottom:'1px solid var(--border)',background:'rgba(13,13,15,0.95)',backdropFilter:'blur(12px)',zIndex:10}}>
+        <div style={{display:'flex',gap:8,overflowX:'auto',paddingBottom:2}}>
+          {categories.map(cat=>(
+            <Chip key={cat.id}
+              active={cat.id==='all'?isAllActive:selectedCategories.includes(cat.id)}
+              color={cat.color}
+              onClick={()=>toggleCategory(cat.id)}>
+              {cat.label}
+            </Chip>
+          ))}
+          <button className="chip-base circle-icon-button"
+            style={{background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.08)',color:'#a1a1aa',fontSize:20,flexShrink:0}}
+            onClick={()=>setAddCatOpen(true)} title="Новая категория">+</button>
+        </div>
+      </div>
+
+      {/* Canvas */}
+      <div style={{flex:1,position:'relative',overflow:'hidden'}} onClick={()=>{if(selectedEdgeId){setSelectedEdgeId(null);}}}>
+        <Graph
+          nodes={visibleNodes}
+          edges={visibleEdges}
+          categories={categories}
+          onNodeClick={handleNodeClick}
+          onCreateEdge={handleCreateEdge}
+          onEdgeClick={handleEdgeClick}
+          selectedEdgeId={selectedEdgeId}
+        />
+        {/* Long press hint */}
+        <div style={{position:'absolute',bottom:96,left:'50%',transform:'translateX(-50%)',background:'rgba(0,0,0,0.6)',backdropFilter:'blur(8px)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:9999,padding:'6px 16px',fontSize:12,color:'rgba(255,255,255,0.4)',pointerEvents:'none',whiteSpace:'nowrap'}}>
+          Удерживайте узел для создания связи
+        </div>
+        {/* Selected edge actions */}
+        {selectedEdgeId&&(
+          <div style={{position:'absolute',bottom:96,left:'50%',transform:'translateX(-50%)',background:'var(--surface)',border:'1px solid var(--border)',borderRadius:12,padding:'10px 16px',display:'flex',alignItems:'center',gap:12,zIndex:20,boxShadow:'0 8px 24px rgba(0,0,0,0.5)'}}>
+            <span style={{fontSize:13,color:'var(--textmuted)'}}>Связь выбрана</span>
+            <button className="btn btn-danger" style={{padding:'6px 14px',fontSize:13}} onClick={handleDeleteEdge}>Удалить связь</button>
+          </div>
+        )}
+      </div>
+
+      {/* FAB */}
+      <button className="fab" onClick={()=>setAddNoteOpen(true)} title="Новая заметка">+</button>
+
+      {/* Note detail */}
+      {noteOpen&&selectedNode&&(
+        <>
+          <div className="sheet-overlay" onClick={()=>setNoteOpen(false)}/>
+          <div className={isSideSheet?'side-sheet':'sheet'}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:16}}>
+              <div style={{flex:1,marginRight:12}}>
+                <h2 style={{fontSize:18,fontWeight:600,marginBottom:6}}>{selectedNode.title}</h2>
+                <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                  {catMap[selectedNode.category]&&(
+                    <span className="badge" style={{background:`${catMap[selectedNode.category].color}22`,color:catMap[selectedNode.category].color}}>
+                      <span style={{width:5,height:5,borderRadius:'50%',background:catMap[selectedNode.category].color}}/>
+                      {catMap[selectedNode.category].label}
+                    </span>
+                  )}
+                  {selectedNode.date&&<span style={{fontSize:12,color:'var(--textmuted)'}}>{formatDate(selectedNode.date)}</span>}
+                </div>
+              </div>
+              <button onClick={()=>setNoteOpen(false)} style={{background:'none',border:'none',color:'var(--textmuted)',cursor:'pointer',fontSize:20,lineHeight:1,padding:4}}>✕</button>
+            </div>
+            <p style={{fontSize:14,lineHeight:1.7,color:'rgba(255,255,255,0.7)',marginBottom:20}}>{selectedNode.text||'Текст заметки отсутствует.'}</p>
+            <div style={{display:'flex',gap:8}}>
+              <button className="btn btn-ghost" style={{flex:1}} onClick={()=>{setEditForm({title:selectedNode.title,text:selectedNode.text||'',category:selectedNode.category,date:selectedNode.date||''});setEditOpen(true);}}>Редактировать</button>
+              <button className="btn btn-danger" style={{flex:1}} onClick={handleDeleteNode}>Удалить</button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Edit note */}
+      {editOpen&&selectedNode&&(
+        <>
+          <div className="sheet-overlay" onClick={()=>setEditOpen(false)}/>
+          <div className={`sheet ${isSideSheet?'':'sheet-lg'}`} style={isSideSheet?{right:0,left:'auto',top:0,bottom:0,width:360,borderRadius:'16px 0 0 16px',borderTop:'none',borderLeft:'1px solid var(--border)',animation:'slideRight 250ms cubic-bezier(0.16,1,0.3,1)'}:{}}>
+            <h3 style={{fontSize:16,fontWeight:600,marginBottom:16}}>Редактировать заметку</h3>
+            <div style={{display:'flex',flexDirection:'column',gap:12}}>
+              <input className="input" placeholder="Заголовок" value={editForm.title} onChange={e=>setEditForm(f=>({...f,title:e.target.value}))}/>
+              <textarea className="input" placeholder="Текст заметки" rows={4} value={editForm.text} onChange={e=>setEditForm(f=>({...f,text:e.target.value}))} style={{resize:'vertical'}}/>
+              <select className="input" value={editForm.category} onChange={e=>setEditForm(f=>({...f,category:e.target.value}))}>
+                {categories.filter(c=>c.id!=='all').map(c=><option key={c.id} value={c.id}>{c.label}</option>)}
+              </select>
+              <input className="input" type="date" value={editForm.date} onChange={e=>setEditForm(f=>({...f,date:e.target.value}))}/>
+              <div style={{display:'flex',gap:8,marginTop:4}}>
+                <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setEditOpen(false)}>Отмена</button>
+                <button className="btn btn-primary" style={{flex:1}} onClick={handleSaveEdit}>Сохранить</button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Add category */}
+      {addCatOpen&&(
+        <>
+          <div className="sheet-overlay" onClick={()=>setAddCatOpen(false)}/>
+          <div className="sheet">
+            <h3 style={{fontSize:16,fontWeight:600,marginBottom:16}}>Новая категория</h3>
+            <div style={{display:'flex',flexDirection:'column',gap:14}}>
+              <input className="input" placeholder="Название категории" value={newCatName} onChange={e=>setNewCatName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleAddCategory()}/>
+              <div>
+                <div style={{fontSize:13,color:'var(--textmuted)',marginBottom:10}}>Цвет</div>
+                <ColorPicker value={newCatColor} onChange={setNewCatColor}/>
+              </div>
+              <div style={{display:'flex',gap:8,marginTop:4}}>
+                <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setAddCatOpen(false)}>Отмена</button>
+                <button className="btn btn-primary" style={{flex:1}} onClick={handleAddCategory}>Создать</button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Add note */}
+      {addNoteOpen&&(
+        <>
+          <div className="sheet-overlay" onClick={()=>setAddNoteOpen(false)}/>
+          <div className="sheet sheet-lg">
+            <h3 style={{fontSize:16,fontWeight:600,marginBottom:16}}>Новая заметка</h3>
+            <div style={{display:'flex',flexDirection:'column',gap:12}}>
+              <input className="input" placeholder="Заголовок *" value={noteForm.title} onChange={e=>setNoteForm(f=>({...f,title:e.target.value}))}/>
+              <textarea className="input" placeholder="Текст заметки" rows={4} value={noteForm.text} onChange={e=>setNoteForm(f=>({...f,text:e.target.value}))} style={{resize:'vertical'}}/>
+              <select className="input" value={noteForm.category} onChange={e=>setNoteForm(f=>({...f,category:e.target.value}))}>
+                {categories.filter(c=>c.id!=='all').map(c=><option key={c.id} value={c.id}>{c.label}</option>)}
+              </select>
+              <input className="input" type="date" value={noteForm.date} onChange={e=>setNoteForm(f=>({...f,date:e.target.value}))}/>
+              <div style={{display:'flex',gap:8,marginTop:4}}>
+                <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setAddNoteOpen(false)}>Отмена</button>
+                <button className="btn btn-primary" style={{flex:1}} onClick={handleAddNote}>Добавить</button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
