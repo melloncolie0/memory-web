@@ -1,743 +1,936 @@
-<!DOCTYPE html>
-<html lang="ru" data-theme="dark">
+<!doctype html>
+<html lang="ru">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Memory Web</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<style>
-  :root{--bg:#0d0d0f;--surface:#161618;--surface2:#1e1e21;--border:rgba(255,255,255,0.07);--text:#e4e4e7;--textmuted:#71717a;--radius:12px}
-  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-  body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;min-height:100dvh;overflow:hidden;-webkit-font-smoothing:antialiased}
-  ::-webkit-scrollbar{width:4px;height:4px}
-  ::-webkit-scrollbar-track{background:transparent}
-  ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:4px}
-  .chip-base{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:9999px;cursor:pointer;white-space:nowrap;user-select:none;font-size:13px;font-weight:500;border:1px solid transparent;transition:all 150ms ease}
-  .circle-icon-button{padding:0;width:36px;height:36px;justify-content:center;border-radius:9999px}
-  .fab{position:fixed;bottom:28px;right:24px;width:56px;height:56px;border-radius:9999px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.1);color:#fff;font-size:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(12px);box-shadow:0 8px 24px rgba(0,0,0,0.4);transition:all 150ms ease;z-index:50}
-  .fab:hover{background:rgba(255,255,255,0.15);transform:scale(1.04)}
-  .fab:active{transform:scale(0.96)}
-  .sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);z-index:60;animation:fadeIn 200ms ease}
-  .sheet{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);border-radius:20px 20px 0 0;z-index:70;padding:24px;max-height:80dvh;overflow-y:auto;animation:slideUp 250ms cubic-bezier(0.16,1,0.3,1)}
-  .sheet-lg{max-height:90dvh}
-  .side-sheet{position:fixed;top:0;right:0;bottom:0;width:360px;background:var(--surface);border-left:1px solid var(--border);z-index:70;padding:24px;overflow-y:auto;animation:slideRight 250ms cubic-bezier(0.16,1,0.3,1)}
-  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-  @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
-  @keyframes slideRight{from{transform:translateX(100%)}to{transform:translateX(0)}}
-  @keyframes pulseRing{0%{transform:scale(1);opacity:0.8}50%{transform:scale(1.35);opacity:0.3}100%{transform:scale(1);opacity:0.8}}
-  .input{width:100%;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-size:14px;outline:none;transition:border 150ms}
-  .input:focus{border-color:rgba(255,255,255,0.2)}
-  .input::placeholder{color:var(--textmuted)}
-  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 20px;border-radius:10px;font-size:14px;font-weight:500;cursor:pointer;border:none;transition:all 150ms ease}
-  .btn-primary{background:rgba(255,255,255,0.12);color:#fff}
-  .btn-primary:hover{background:rgba(255,255,255,0.18)}
-  .btn-ghost{background:transparent;color:var(--textmuted);border:1px solid var(--border)}
-  .btn-ghost:hover{color:var(--text);border-color:rgba(255,255,255,0.15)}
-  .btn-danger{background:rgba(239,68,68,0.15);color:#f87171}
-  .btn-danger:hover{background:rgba(239,68,68,0.25)}
-  .badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:9999px;font-size:12px;font-weight:500}
-  select.input option{background:var(--surface2);color:var(--text)}
-  canvas{display:block}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Memory Web</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            bg: '#090d18',
+            surface: '#111623',
+            surface2: '#171d2d',
+            textmain: '#eff3ff',
+            textmuted: '#95a0bd',
+            textsoft: '#6f7893',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    html, body, #root { height: 100%; margin: 0; }
+    body {
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #090d18;
+      color: #eff3ff;
+      overflow: hidden;
+      letter-spacing: -0.01em;
+    }
+    * { box-sizing: border-box; }
+    .scrollbar-thin::-webkit-scrollbar { height: 6px; width: 6px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.10); border-radius: 999px; }
+    .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+    .graph-wrap { cursor: default; }
+    .graph-canvas { width: 100%; height: 100%; display: block; touch-action: none; user-select: none; -webkit-user-select: none; }
+    .glass-header {
+      background: rgba(9, 13, 24, 0.82);
+      backdrop-filter: blur(20px) saturate(140%);
+      -webkit-backdrop-filter: blur(20px) saturate(140%);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .sheet-surface {
+      background: linear-gradient(180deg, rgba(23,29,45,0.98), rgba(17,22,35,0.98));
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
+    }
+    .ios-handle {
+      width: 38px;
+      height: 5px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.14);
+      margin: 10px auto 2px;
+    }
+    .field-shell {
+      background: rgba(255,255,255,0.045);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .field-shell:focus-within {
+      border-color: rgba(255,255,255,0.18);
+      background: rgba(255,255,255,0.065);
+    }
+    .chip-base {
+      height: 34px;
+      min-height: 34px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      white-space: nowrap;
+      line-height: 1;
+      padding-inline: 13px;
+      padding-block: 0;
+    }
+    .chip-plus-glyph { display: inline-block; transform: translateY(-1px); line-height: 1; }
+    .fab-plus-glyph { display: inline-block; transform: translateY(-2px); line-height: 1; }
+    .circle-icon-button { display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+    input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1) opacity(0.6); }
+  </style>
 </head>
 <body>
-<div id="root"></div>
-<script type="text/babel">
-const { useState, useEffect, useRef, useCallback, useMemo } = React;
+  <div id="root"></div>
 
-const PRESET_COLORS = ['#6366f1','#ec4899','#f59e0b','#10b981','#3b82f6','#ef4444'];
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-const INITIAL_CATEGORIES = [
-  {id:'all',label:'Все',color:'#71717a'},
-  {id:'work',label:'Работа',color:'#6366f1'},
-  {id:'personal',label:'Личное',color:'#ec4899'},
-  {id:'ideas',label:'Идеи',color:'#f59e0b'},
-  {id:'travel',label:'Путешествия',color:'#10b981'},
-];
+  <script type="text/babel">
+    const { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } = React;
 
-const INITIAL_NODES = [
-  {id:'n1',title:'Запустить проект',text:'Финализировать дизайн и передать разработчикам к концу месяца.',category:'work',date:'2024-01-10',x:null,y:null},
-  {id:'n2',title:'Встреча с командой',text:'Обсудить спринт и приоритеты на неделю.',category:'work',date:'2024-01-12',x:null,y:null},
-  {id:'n3',title:'День рождения мамы',text:'Не забыть купить торт и цветы.',category:'personal',date:'2024-01-15',x:null,y:null},
-  {id:'n4',title:'Прочитать книгу',text:'«Думай медленно, решай быстро» — лежит уже три месяца.',category:'personal',date:'2024-01-08',x:null,y:null},
-  {id:'n5',title:'Приложение для графов',text:'Сделать интерактивный граф заметок как нейросеть.',category:'ideas',date:'2024-01-14',x:null,y:null},
-  {id:'n6',title:'Тёмная тема дизайна',text:'Минимализм + тёмный фон + цветные акценты на категории.',category:'ideas',date:'2024-01-11',x:null,y:null},
-  {id:'n7',title:'Токио',text:'Посетить в сакурный сезон. Арашияма, Симокитадзава, рынок Цукидзи.',category:'travel',date:'2024-01-09',x:null,y:null},
-  {id:'n8',title:'Грузия',text:'Тбилиси и Батуми — горы, вино, архитектура.',category:'travel',date:'2024-01-13',x:null,y:null},
-  {id:'n9',title:'Стенд-ап ежедневно',text:'15 минут в 10:00 — коротко, по делу.',category:'work',date:'2024-01-07',x:null,y:null},
-  {id:'n10',title:'Медитация',text:'Попробовать утренние практики по 10 минут.',category:'personal',date:'2024-01-06',x:null,y:null},
-];
+    const COLOR_PRESETS = ['#7BA7FF', '#A38BFF', '#52C7A5', '#F2B56B', '#F28A8A', '#D993FF'];
+    const GRAPH_PADDING = { top: 48, right: 36, bottom: 130, left: 36 };
+    const WORLD_WIDTH = 1100;
+    const WORLD_HEIGHT = 760;
 
-const INITIAL_EDGES = [
-  {id:'e1',source:'n1',target:'n2'},
-  {id:'e2',source:'n1',target:'n9'},
-  {id:'e3',source:'n5',target:'n6'},
-  {id:'e4',source:'n7',target:'n8'},
-  {id:'e5',source:'n3',target:'n4'},
-  {id:'e6',source:'n5',target:'n1'},
-  {id:'e7',source:'n10',target:'n4'},
-];
+    const initialCategories = [
+      { id: 'all', name: 'Все', color: '#8F9BB3', locked: true },
+      { id: 'work', name: 'Работа', color: '#7BA7FF' },
+      { id: 'personal', name: 'Личное', color: '#D993FF' },
+      { id: 'ideas', name: 'Идеи', color: '#A38BFF' },
+      { id: 'travel', name: 'Путешествия', color: '#52C7A5' },
+    ];
 
-function edgeKey(a,b){return [a,b].sort().join('__')}
+    const initialNodes = [
+      { id: 'n1', title: 'Редизайн портфолио', text: 'Собрать кейсы по UX/UI и оформить главную страницу в более чистом стиле.', date: '2026-05-21', category: 'work', importance: 1.15, x: 215, y: 170 },
+      { id: 'n2', title: 'Сценарий онбординга', text: 'Продумать первый экран и подсказки для нового пользователя в продукте.', date: '2026-05-26', category: 'work', importance: 1.05, x: 438, y: 154 },
+      { id: 'n3', title: 'Идея: карта привычек', text: 'Сделать визуальную карту привычек с узлами и связями между действиями.', date: '2026-05-28', category: 'ideas', importance: 1.18, x: 612, y: 238 },
+      { id: 'n4', title: 'Поездка в Шанхай', text: 'Список мест: набережная, книжные магазины, чайные и музей дизайна.', date: '2026-04-11', category: 'travel', importance: 1.08, x: 822, y: 190 },
+      { id: 'n5', title: 'Личная заметка', text: 'Хочу выделять больше времени на отдых без чувства вины и цифрового шума.', date: '2026-05-18', category: 'personal', importance: 0.96, x: 296, y: 432 },
+      { id: 'n6', title: 'Исследование пользователей', text: 'Подготовить вопросы для коротких интервью и структурировать инсайты.', date: '2026-05-14', category: 'work', importance: 1.12, x: 196, y: 332 },
+      { id: 'n7', title: 'Идея продукта', text: 'Мини-приложение для хранения мыслей как граф памяти, а не как линейный список.', date: '2026-05-30', category: 'ideas', importance: 1.24, x: 548, y: 402 },
+      { id: 'n8', title: 'Маршрут выходного дня', text: 'Кофейня, прогулка по парку, заметки в блокнот и вечер без уведомлений.', date: '2026-05-09', category: 'personal', importance: 0.92, x: 742, y: 534 },
+      { id: 'n9', title: 'Пекин: язык и быт', text: 'Собрать полезные фразы на китайском и бытовые советы на первые недели.', date: '2026-03-29', category: 'travel', importance: 1.0, x: 930, y: 370 },
+      { id: 'n10', title: 'Механика связей', text: 'Связи между заметками должны помогать находить неожиданные ассоциации.', date: '2026-05-31', category: 'ideas', importance: 1.3, x: 510, y: 598 },
+    ];
 
-function formatDate(d){
-  if(!d)return'';
-  const dt=new Date(d);
-  return dt.toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'});
-}
+    const initialLinks = [
+      { source: 'n1', target: 'n2' },
+      { source: 'n1', target: 'n6' },
+      { source: 'n2', target: 'n7' },
+      { source: 'n3', target: 'n7' },
+      { source: 'n3', target: 'n10' },
+      { source: 'n4', target: 'n9' },
+      { source: 'n5', target: 'n8' },
+      { source: 'n6', target: 'n7' },
+      { source: 'n7', target: 'n10' },
+      { source: 'n4', target: 'n8' },
+      { source: 'n5', target: 'n3' },
+    ];
 
-function ColorPicker({value,onChange}){
-  return(
-    <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-      {PRESET_COLORS.map(c=>(
-        <div key={c} onClick={()=>onChange(c)}
-          style={{width:28,height:28,borderRadius:'50%',background:c,cursor:'pointer',
-            border:value===c?'2px solid #fff':'2px solid transparent',
-            boxShadow:value===c?`0 0 0 2px ${c}55`:'none',
-            transition:'all 150ms'}}
-        />
-      ))}
-    </div>
-  );
-}
+    const categoryMapFrom = (categories) => Object.fromEntries(categories.map((c) => [c.id, c]));
+    const formatDate = (date) => date ? new Date(date + 'T12:00:00').toLocaleDateString('ru-RU') : 'Без даты';
+    const getLinkId = (source, target) => [source, target].sort().join('__');
+    const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+    const softMix = (color) => `color-mix(in srgb, ${color} 26%, rgba(255,255,255,0.08))`;
+    const strongChipFill = (color) => `color-mix(in srgb, ${color} 80%, rgba(255,255,255,0.12))`;
 
-function Chip({active,color,children,onClick}){
-  return(
-    <button className="chip-base" onClick={onClick}
-      style={{
-        background: active ? `color-mix(in srgb, ${color} 70%, rgba(255,255,255,0.1))` : 'rgba(255,255,255,0.05)',
-        border: active ? `1px solid ${color}88` : '1px solid rgba(255,255,255,0.08)',
-        color: active ? '#fff' : '#a1a1aa',
-        boxShadow: active ? `0 0 10px ${color}44` : 'none',
-      }}>
-      {active && <span style={{width:6,height:6,borderRadius:'50%',background:'#fff',opacity:0.8,flexShrink:0}}/>}
-      {children}
-    </button>
-  );
-}
-
-function Graph({nodes,edges,categories,onNodeClick,onCreateEdge,onEdgeClick,selectedEdgeId}){
-  const canvasRef=useRef(null);
-  const stateRef=useRef({
-    pan:{x:0,y:0},scale:1,
-    dragging:null,
-    panning:false,panStart:null,panOrigin:null,
-    longPressTimer:null,longPressNode:null,
-    connectMode:false,connectSource:null,
-    previewLine:null,
-    hoverNode:null,
-    positions:{},
-    newEdgeAnim:null,
-    newEdgeAnimStart:null,
-  });
-  const [tick,setTick]=useState(0);
-  const repaint=useCallback(()=>setTick(t=>t+1),[]);
-
-  const catMap=useMemo(()=>{
-    const m={};categories.forEach(c=>m[c.id]=c);return m;
-  },[categories]);
-
-  const nodeRadius=useCallback((node)=>{
-    const conns=edges.filter(e=>e.source===node.id||e.target===node.id).length;
-    return 18+Math.min(conns,6)*2;
-  },[edges]);
-
-  // Init positions
-  useEffect(()=>{
-    const st=stateRef.current;
-    const canvas=canvasRef.current;
-    if(!canvas)return;
-    const W=canvas.width,H=canvas.height;
-    nodes.forEach((n,i)=>{
-      if(!st.positions[n.id]){
-        const angle=(i/nodes.length)*2*Math.PI;
-        const r=Math.min(W,H)*0.28;
-        st.positions[n.id]={
-          x:W/2+r*Math.cos(angle),
-          y:H/2+r*Math.sin(angle),
-        };
-      }
-    });
-  },[nodes]);
-
-  // Resize
-  useEffect(()=>{
-    const canvas=canvasRef.current;
-    if(!canvas)return;
-    const resize=()=>{
-      canvas.width=canvas.offsetWidth;
-      canvas.height=canvas.offsetHeight;
-      repaint();
-    };
-    resize();
-    const ro=new ResizeObserver(resize);
-    ro.observe(canvas);
-    return()=>ro.disconnect();
-  },[]);
-
-  // Draw
-  useEffect(()=>{
-    const canvas=canvasRef.current;
-    if(!canvas)return;
-    const ctx=canvas.getContext('2d');
-    const st=stateRef.current;
-    const W=canvas.width,H=canvas.height;
-    ctx.clearRect(0,0,W,H);
-    ctx.save();
-    ctx.translate(st.pan.x,st.pan.y);
-    ctx.scale(st.scale,st.scale);
-
-    const getPos=(id)=>st.positions[id]||{x:W/2,y:H/2};
-
-    // Edges
-    edges.forEach(edge=>{
-      const sp=getPos(edge.source);
-      const tp=getPos(edge.target);
-      const isSelected=edge.id===selectedEdgeId;
-      const isNew=st.newEdgeAnim===edge.id;
-      let progress=1;
-      if(isNew&&st.newEdgeAnimStart){
-        progress=Math.min(1,(Date.now()-st.newEdgeAnimStart)/400);
-        if(progress<1)repaint();
-        else st.newEdgeAnim=null;
-      }
-      ctx.save();
-      ctx.strokeStyle=isSelected?'rgba(239,68,68,0.8)':isNew?'rgba(255,255,255,0.5)':'rgba(255,255,255,0.12)';
-      ctx.lineWidth=isSelected?2:1;
-      ctx.globalAlpha=isNew?progress:1;
-      if(isSelected){ctx.shadowColor='rgba(239,68,68,0.4)';ctx.shadowBlur=8;}
-      ctx.beginPath();
-      const mx=sp.x+(tp.x-sp.x)*progress;
-      const my=sp.y+(tp.y-sp.y)*progress;
-      ctx.moveTo(sp.x,sp.y);
-      ctx.lineTo(mx,my);
-      ctx.stroke();
-      ctx.restore();
-    });
-
-    // Preview line
-    if(st.connectMode&&st.previewLine&&st.connectSource){
-      const sp=getPos(st.connectSource);
-      const pl=st.previewLine;
-      ctx.save();
-      ctx.strokeStyle='rgba(99,102,241,0.9)';
-      ctx.lineWidth=2;
-      ctx.setLineDash([6,4]);
-      ctx.shadowColor='rgba(99,102,241,0.6)';
-      ctx.shadowBlur=10;
-      ctx.beginPath();
-      ctx.moveTo(sp.x,sp.y);
-      ctx.lineTo(pl.x,pl.y);
-      ctx.stroke();
-      ctx.restore();
+    function measureRadius(node, degree) {
+      return 13 + degree * 1.2 + ((node.importance || 1) - 1) * 8;
     }
 
-    // Nodes
-    nodes.forEach(node=>{
-      const pos=getPos(node.id);
-      const r=nodeRadius(node);
-      const cat=catMap[node.category];
-      const color=cat?cat.color:'#71717a';
-      const isHovered=st.hoverNode===node.id;
-      const isConnectSource=st.connectSource===node.id;
-      const isPotentialTarget=st.connectMode&&st.hoverNode===node.id&&st.connectSource!==node.id;
-
-      // Pulse ring for connect source
-      if(isConnectSource&&st.connectMode){
-        const pulse=(Math.sin(Date.now()/300)*0.5+0.5)*0.6+0.2;
-        ctx.save();
-        ctx.strokeStyle=color;
-        ctx.lineWidth=2;
-        ctx.globalAlpha=pulse;
-        ctx.shadowColor=color;
-        ctx.shadowBlur=16;
-        ctx.beginPath();
-        ctx.arc(pos.x,pos.y,r+8,0,Math.PI*2);
-        ctx.stroke();
-        ctx.restore();
-        repaint();
-      }
-
-      // Hover ring for potential target
-      if(isPotentialTarget){
-        ctx.save();
-        ctx.strokeStyle=color;
-        ctx.lineWidth=2;
-        ctx.globalAlpha=0.8;
-        ctx.shadowColor=color;
-        ctx.shadowBlur=20;
-        ctx.beginPath();
-        ctx.arc(pos.x,pos.y,r+6,0,Math.PI*2);
-        ctx.stroke();
-        ctx.restore();
-      }
-
-      // Node shadow
-      ctx.save();
-      ctx.shadowColor=color+'66';
-      ctx.shadowBlur=isHovered?20:10;
-      ctx.beginPath();
-      ctx.arc(pos.x,pos.y,r,0,Math.PI*2);
-      ctx.fillStyle=`color-mix(in srgb,${color} 30%,#1a1a1f)`;
-      ctx.fill();
-      ctx.restore();
-
-      // Node border
-      ctx.save();
-      ctx.strokeStyle=isHovered?color:`${color}88`;
-      ctx.lineWidth=isHovered?2:1.5;
-      ctx.beginPath();
-      ctx.arc(pos.x,pos.y,r,0,Math.PI*2);
-      ctx.stroke();
-      ctx.restore();
-
-      // Label
-      ctx.save();
-      ctx.fillStyle='rgba(255,255,255,0.85)';
-      ctx.font=`500 ${Math.max(10,r*0.55)}px Inter,system-ui,sans-serif`;
-      ctx.textAlign='center';
-      ctx.textBaseline='middle';
-      const maxLen=Math.floor(r*1.5/5);
-      let label=node.title.length>maxLen?node.title.slice(0,maxLen)+'…':node.title;
-      ctx.fillText(label,pos.x,pos.y);
-      ctx.restore();
-    });
-
-    ctx.restore();
-  },[nodes,edges,catMap,nodeRadius,selectedEdgeId,tick]);
-
-  const toWorld=useCallback((cx,cy)=>{
-    const st=stateRef.current;
-    return{x:(cx-st.pan.x)/st.scale,y:(cy-st.pan.y)/st.scale};
-  },[]);
-
-  const hitNode=useCallback((wx,wy)=>{
-    const st=stateRef.current;
-    return nodes.find(n=>{
-      const pos=st.positions[n.id];
-      if(!pos)return false;
-      const r=nodeRadius(n)+4;
-      return Math.hypot(pos.x-wx,pos.y-wy)<r;
-    })||null;
-  },[nodes,nodeRadius]);
-
-  const hitEdge=useCallback((wx,wy)=>{
-    const st=stateRef.current;
-    const THRESH=8;
-    return edges.find(edge=>{
-      const sp=st.positions[edge.source];
-      const tp=st.positions[edge.target];
-      if(!sp||!tp)return false;
-      const dx=tp.x-sp.x,dy=tp.y-sp.y;
-      const len=Math.hypot(dx,dy);
-      if(len<1)return false;
-      const t=((wx-sp.x)*dx+(wy-sp.y)*dy)/(len*len);
-      if(t<0||t>1)return false;
-      const px=sp.x+t*dx,py=sp.y+t*dy;
-      return Math.hypot(wx-px,wy-py)<THRESH;
-    })||null;
-  },[edges]);
-
-  const cancelLongPress=useCallback(()=>{
-    const st=stateRef.current;
-    if(st.longPressTimer){clearTimeout(st.longPressTimer);st.longPressTimer=null;}
-  },[]);
-
-  const getEventPos=useCallback((e)=>{
-    const canvas=canvasRef.current;
-    const rect=canvas.getBoundingClientRect();
-    const touch=e.touches?e.touches[0]:e;
-    return{cx:touch.clientX-rect.left,cy:touch.clientY-rect.top};
-  },[]);
-
-  const onPointerDown=useCallback((e)=>{
-    const st=stateRef.current;
-    const{cx,cy}=getEventPos(e);
-    const{x:wx,y:wy}=toWorld(cx,cy);
-    const node=hitNode(wx,wy);
-
-    if(node){
-      cancelLongPress();
-      st.longPressNode=node.id;
-      st.longPressTimer=setTimeout(()=>{
-        st.connectMode=true;
-        st.connectSource=node.id;
-        st.dragging=null;
-        repaint();
-      },500);
-      st.dragging={id:node.id,ox:wx-st.positions[node.id].x,oy:wy-st.positions[node.id].y};
-      st.pointerDownPos={cx,cy};
-      st.pointerMoved=false;
-    } else {
-      st.panning=true;
-      st.panStart={cx,cy};
-      st.panOrigin={...st.pan};
-    }
-  },[hitNode,toWorld,cancelLongPress,repaint]);
-
-  const onPointerMove=useCallback((e)=>{
-    const st=stateRef.current;
-    const{cx,cy}=getEventPos(e);
-    const{x:wx,y:wy}=toWorld(cx,cy);
-
-    if(st.pointerDownPos){
-      const dx=Math.abs(cx-st.pointerDownPos.cx),dy=Math.abs(cy-st.pointerDownPos.cy);
-      if(dx>5||dy>5)st.pointerMoved=true;
+    function truncateLabel(ctx, text, maxWidth) {
+      if (!text) return '';
+      if (ctx.measureText(text).width <= maxWidth) return text;
+      let result = text;
+      while (result.length > 1 && ctx.measureText(result + '…').width > maxWidth) result = result.slice(0, -1);
+      return result + '…';
     }
 
-    if(st.connectMode&&st.connectSource){
-      cancelLongPress();
-      st.previewLine={x:wx,y:wy};
-      const hn=hitNode(wx,wy);
-      st.hoverNode=hn?hn.id:null;
-      repaint();
-      return;
+    function Chip({ active, color, children, onClick, plus }) {
+      return (
+        <button
+          onClick={onClick}
+          className={`chip-base shrink-0 border text-[13px] font-medium tracking-[-0.01em] transition active:scale-[0.985] ${active ? 'border-white/5 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]' : 'border-white/10 text-textmuted hover:border-white/15 hover:text-white'} ${plus ? 'circle-icon-button w-9 px-0 text-[20px]' : ''}`}
+          style={{ background: active ? strongChipFill(color) : 'rgba(255,255,255,0.04)', borderColor: active ? 'rgba(255,255,255,0.08)' : undefined }}
+        >
+          {plus ? <span className="chip-plus-glyph" aria-hidden="true">+</span> : children}
+        </button>
+      );
     }
 
-    if(st.dragging){
-      if(st.pointerMoved){
-        cancelLongPress();
-        st.positions[st.dragging.id]={x:wx-st.dragging.ox,y:wy-st.dragging.oy};
-        repaint();
-      }
-      return;
-    }
-
-    if(st.panning&&st.panStart){
-      st.pan={x:st.panOrigin.x+(cx-st.panStart.cx),y:st.panOrigin.y+(cy-st.panStart.cy)};
-      repaint();
-      return;
-    }
-
-    const hn=hitNode(wx,wy);
-    const prev=st.hoverNode;
-    st.hoverNode=hn?hn.id:null;
-    if(prev!==st.hoverNode)repaint();
-  },[toWorld,hitNode,cancelLongPress,repaint]);
-
-  const onPointerUp=useCallback((e)=>{
-    const st=stateRef.current;
-    cancelLongPress();
-    const{cx,cy}=getEventPos(e);
-    const{x:wx,y:wy}=toWorld(cx,cy);
-    const node=hitNode(wx,wy);
-
-    if(st.connectMode&&st.connectSource){
-      if(node&&node.id!==st.connectSource){
-        onCreateEdge(st.connectSource,node.id);
-        const eid='e_'+Date.now();
-        st.newEdgeAnim=eid;
-        st.newEdgeAnimStart=Date.now();
-      }
-      st.connectMode=false;
-      st.connectSource=null;
-      st.previewLine=null;
-      st.hoverNode=null;
-      st.dragging=null;
-      repaint();
-      return;
-    }
-
-    if(st.dragging&&!st.pointerMoved){
-      const{x:wx2,y:wy2}=toWorld(cx,cy);
-      const tappedNode=hitNode(wx2,wy2);
-      if(tappedNode){
-        onNodeClick(tappedNode);
-      } else {
-        const tappedEdge=hitEdge(wx2,wy2);
-        if(tappedEdge)onEdgeClick(tappedEdge);
-      }
-    } else if(!st.dragging&&!st.panning){
-      const tappedEdge=hitEdge(wx,wy);
-      if(tappedEdge)onEdgeClick(tappedEdge);
-    }
-
-    st.dragging=null;
-    st.panning=false;
-    st.panStart=null;
-    st.panOrigin=null;
-    st.pointerDownPos=null;
-    st.pointerMoved=false;
-    repaint();
-  },[hitNode,hitEdge,toWorld,cancelLongPress,onNodeClick,onCreateEdge,onEdgeClick,repaint]);
-
-  const onWheel=useCallback((e)=>{
-    e.preventDefault();
-    const st=stateRef.current;
-    const canvas=canvasRef.current;
-    const rect=canvas.getBoundingClientRect();
-    const cx=e.clientX-rect.left,cy=e.clientY-rect.top;
-    const delta=e.deltaY>0?0.9:1.1;
-    const newScale=Math.max(0.3,Math.min(4,st.scale*delta));
-    st.pan={x:cx-(cx-st.pan.x)*(newScale/st.scale),y:cy-(cy-st.pan.y)*(newScale/st.scale)};
-    st.scale=newScale;
-    repaint();
-  },[repaint]);
-
-  useEffect(()=>{
-    const canvas=canvasRef.current;
-    if(!canvas)return;
-    canvas.addEventListener('wheel',onWheel,{passive:false});
-    return()=>canvas.removeEventListener('wheel',onWheel);
-  },[onWheel]);
-
-  return(
-    <canvas ref={canvasRef}
-      style={{width:'100%',height:'100%',touchAction:'none',cursor:'default'}}
-      onMouseDown={onPointerDown} onMouseMove={onPointerMove} onMouseUp={onPointerUp}
-      onTouchStart={e=>{e.preventDefault();onPointerDown(e);}}
-      onTouchMove={e=>{e.preventDefault();onPointerMove(e);}}
-      onTouchEnd={e=>{e.preventDefault();onPointerUp(e);}}
-    />
-  );
-}
-
-function App(){
-  const [categories,setCategories]=useState(INITIAL_CATEGORIES);
-  const [nodes,setNodes]=useState(INITIAL_NODES);
-  const [edges,setEdges]=useState(INITIAL_EDGES);
-  const [selectedCategories,setSelectedCategories]=useState(['all']);
-  const [selectedEdgeId,setSelectedEdgeId]=useState(null);
-  const [selectedNode,setSelectedNode]=useState(null);
-  const [noteOpen,setNoteOpen]=useState(false);
-  const [addCatOpen,setAddCatOpen]=useState(false);
-  const [addNoteOpen,setAddNoteOpen]=useState(false);
-  const [editOpen,setEditOpen]=useState(false);
-  const [newCatName,setNewCatName]=useState('');
-  const [newCatColor,setNewCatColor]=useState(PRESET_COLORS[0]);
-  const [noteForm,setNoteForm]=useState({title:'',text:'',category:'work',date:''});
-  const [editForm,setEditForm]=useState({title:'',text:'',category:'work',date:''});
-
-  const toggleCategory=useCallback((id)=>{
-    setSelectedCategories(prev=>{
-      if(id==='all')return['all'];
-      const base=prev.filter(x=>x!=='all');
-      const exists=base.includes(id);
-      const next=exists?base.filter(x=>x!==id):[...base,id];
-      return next.length?next:['all'];
-    });
-    setSelectedEdgeId(null);
-    setNoteOpen(false);
-  },[]);
-
-  const visibleIds=useMemo(()=>{
-    const hasSpecific=selectedCategories.some(x=>x!=='all');
-    if(!hasSpecific)return new Set(nodes.map(n=>n.id));
-    const s=new Set(selectedCategories);
-    return new Set(nodes.filter(n=>s.has(n.category)).map(n=>n.id));
-  },[nodes,selectedCategories]);
-
-  const visibleNodes=useMemo(()=>nodes.filter(n=>visibleIds.has(n.id)),[nodes,visibleIds]);
-  const visibleEdges=useMemo(()=>edges.filter(e=>visibleIds.has(e.source)&&visibleIds.has(e.target)),[edges,visibleIds]);
-
-  const handleNodeClick=useCallback((node)=>{
-    setSelectedNode(node);
-    setNoteOpen(true);
-    setSelectedEdgeId(null);
-  },[]);
-
-  const handleEdgeClick=useCallback((edge)=>{
-    setSelectedEdgeId(edge.id);
-    setNoteOpen(false);
-  },[]);
-
-  const handleCreateEdge=useCallback((sourceId,targetId)=>{
-    const key=edgeKey(sourceId,targetId);
-    const exists=edges.some(e=>edgeKey(e.source,e.target)===key);
-    if(exists)return;
-    setEdges(prev=>[...prev,{id:'e_'+Date.now(),source:sourceId,target:targetId}]);
-  },[edges]);
-
-  const handleDeleteEdge=useCallback(()=>{
-    if(!selectedEdgeId)return;
-    setEdges(prev=>prev.filter(e=>e.id!==selectedEdgeId));
-    setSelectedEdgeId(null);
-  },[selectedEdgeId]);
-
-  const handleDeleteNode=useCallback(()=>{
-    if(!selectedNode)return;
-    setNodes(prev=>prev.filter(n=>n.id!==selectedNode.id));
-    setEdges(prev=>prev.filter(e=>e.source!==selectedNode.id&&e.target!==selectedNode.id));
-    setNoteOpen(false);
-    setSelectedNode(null);
-  },[selectedNode]);
-
-  const handleSaveEdit=useCallback(()=>{
-    if(!selectedNode)return;
-    setNodes(prev=>prev.map(n=>n.id===selectedNode.id?{...n,...editForm}:n));
-    setSelectedNode(prev=>prev?{...prev,...editForm}:prev);
-    setEditOpen(false);
-  },[selectedNode,editForm]);
-
-  const handleAddCategory=useCallback(()=>{
-    if(!newCatName.trim())return;
-    const id='cat_'+Date.now();
-    setCategories(prev=>[...prev,{id,label:newCatName.trim(),color:newCatColor}]);
-    setNewCatName('');
-    setNewCatColor(PRESET_COLORS[0]);
-    setAddCatOpen(false);
-  },[newCatName,newCatColor]);
-
-  const handleAddNote=useCallback(()=>{
-    if(!noteForm.title.trim())return;
-    setNodes(prev=>[...prev,{id:'n_'+Date.now(),...noteForm,x:null,y:null}]);
-    setNoteForm({title:'',text:'',category:'work',date:''});
-    setAddNoteOpen(false);
-  },[noteForm]);
-
-  const catMap=useMemo(()=>{const m={};categories.forEach(c=>m[c.id]=c);return m;},[categories]);
-  const isAllActive=!selectedCategories.some(x=>x!=='all');
-
-  const isSideSheet=typeof window!=='undefined'&&window.innerWidth>=1024;
-  const NoteSheet=isSideSheet?'div':'div';
-
-  return(
-    <div style={{display:'flex',flexDirection:'column',height:'100dvh',overflow:'hidden'}}>
-      {/* Top bar */}
-      <div style={{padding:'12px 16px',borderBottom:'1px solid var(--border)',background:'rgba(13,13,15,0.95)',backdropFilter:'blur(12px)',zIndex:10}}>
-        <div style={{display:'flex',gap:8,overflowX:'auto',paddingBottom:2}}>
-          {categories.map(cat=>(
-            <Chip key={cat.id}
-              active={cat.id==='all'?isAllActive:selectedCategories.includes(cat.id)}
-              color={cat.color}
-              onClick={()=>toggleCategory(cat.id)}>
-              {cat.label}
-            </Chip>
-          ))}
-          <button className="chip-base circle-icon-button"
-            style={{background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.08)',color:'#a1a1aa',fontSize:20,flexShrink:0}}
-            onClick={()=>setAddCatOpen(true)} title="Новая категория">+</button>
-        </div>
-      </div>
-
-      {/* Canvas */}
-      <div style={{flex:1,position:'relative',overflow:'hidden'}} onClick={()=>{if(selectedEdgeId){setSelectedEdgeId(null);}}}>
-        <Graph
-          nodes={visibleNodes}
-          edges={visibleEdges}
-          categories={categories}
-          onNodeClick={handleNodeClick}
-          onCreateEdge={handleCreateEdge}
-          onEdgeClick={handleEdgeClick}
-          selectedEdgeId={selectedEdgeId}
-        />
-        {/* Long press hint */}
-        <div style={{position:'absolute',bottom:96,left:'50%',transform:'translateX(-50%)',background:'rgba(0,0,0,0.6)',backdropFilter:'blur(8px)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:9999,padding:'6px 16px',fontSize:12,color:'rgba(255,255,255,0.4)',pointerEvents:'none',whiteSpace:'nowrap'}}>
-          Удерживайте узел для создания связи
-        </div>
-        {/* Selected edge actions */}
-        {selectedEdgeId&&(
-          <div style={{position:'absolute',bottom:96,left:'50%',transform:'translateX(-50%)',background:'var(--surface)',border:'1px solid var(--border)',borderRadius:12,padding:'10px 16px',display:'flex',alignItems:'center',gap:12,zIndex:20,boxShadow:'0 8px 24px rgba(0,0,0,0.5)'}}>
-            <span style={{fontSize:13,color:'var(--textmuted)'}}>Связь выбрана</span>
-            <button className="btn btn-danger" style={{padding:'6px 14px',fontSize:13}} onClick={handleDeleteEdge}>Удалить связь</button>
-          </div>
-        )}
-      </div>
-
-      {/* FAB */}
-      <button className="fab" onClick={()=>setAddNoteOpen(true)} title="Новая заметка">+</button>
-
-      {/* Note detail */}
-      {noteOpen&&selectedNode&&(
+    function Sheet({ open, title, onClose, children, side = false }) {
+      return (
         <>
-          <div className="sheet-overlay" onClick={()=>setNoteOpen(false)}/>
-          <div className={isSideSheet?'side-sheet':'sheet'}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:16}}>
-              <div style={{flex:1,marginRight:12}}>
-                <h2 style={{fontSize:18,fontWeight:600,marginBottom:6}}>{selectedNode.title}</h2>
-                <div style={{display:'flex',gap:8,alignItems:'center'}}>
-                  {catMap[selectedNode.category]&&(
-                    <span className="badge" style={{background:`${catMap[selectedNode.category].color}22`,color:catMap[selectedNode.category].color}}>
-                      <span style={{width:5,height:5,borderRadius:'50%',background:catMap[selectedNode.category].color}}/>
-                      {catMap[selectedNode.category].label}
-                    </span>
-                  )}
-                  {selectedNode.date&&<span style={{fontSize:12,color:'var(--textmuted)'}}>{formatDate(selectedNode.date)}</span>}
+          <div onClick={onClose} className={`absolute inset-0 z-30 bg-black/40 transition ${open ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'}`} />
+          <div className={`absolute z-40 border border-white/8 sheet-surface transition duration-300 ${side ? 'right-0 top-0 h-full w-full max-w-md' : 'bottom-0 left-0 right-0 rounded-t-[30px]'} ${open ? 'translate-x-0 translate-y-0 opacity-100' : side ? 'translate-x-full opacity-0' : 'translate-y-full opacity-0'}`}>
+            {!side && <div className="ios-handle" />}
+            <div className="flex items-center justify-between border-b border-white/8 px-5 py-4">
+              <h2 className="text-[15px] font-semibold tracking-[-0.02em] text-white">{title}</h2>
+              <button onClick={onClose} className="chip-base border border-white/8 px-3 text-[13px] text-textmuted hover:text-white">Закрыть</button>
+            </div>
+            <div className="max-h-[78vh] overflow-y-auto px-5 pb-6 pt-5 scrollbar-thin">{children}</div>
+          </div>
+        </>
+      );
+    }
+
+    function Field({ label, children }) {
+      return (
+        <label className="mb-5 block">
+          <span className="mb-2.5 block text-[13px] font-medium tracking-[-0.01em] text-textmuted">{label}</span>
+          {children}
+        </label>
+      );
+    }
+
+    function Input(props) {
+      return <input {...props} className="field-shell w-full rounded-[18px] px-4 py-3.5 text-[15px] text-white outline-none placeholder:text-textsoft" />;
+    }
+
+    function Textarea(props) {
+      return <textarea {...props} className="field-shell min-h-[126px] w-full rounded-[18px] px-4 py-3.5 text-[15px] leading-6 text-white outline-none placeholder:text-textsoft" />;
+    }
+
+    function Select(props) {
+      return <select {...props} className="field-shell w-full rounded-[18px] px-4 py-3.5 text-[15px] text-white outline-none">{props.children}</select>;
+    }
+
+    function GraphCanvas({ visibleNodes, visibleEdges, degreeMap, categoryMap, selectedNodeId, selectedEdgeId, onNodeClick, onNodePositionChange, onCreateLink, onSelectEdge, linkState, setLinkState, newEdgeAnim }) {
+      const wrapRef = useRef(null);
+      const canvasRef = useRef(null);
+      const [size, setSize] = useState({ width: 0, height: 0 });
+      const [viewState, setViewState] = useState({ zoom: 1, panX: 0, panY: 0 });
+      const gestureRef = useRef({ mode: null, nodeId: null, offsetX: 0, offsetY: 0, moved: false, longPressTimer: null, longPressTriggered: false, pointers: new Map(), pinchStartDistance: 0, pinchStartZoom: 1, pinchStartPan: { x: 0, y: 0 } });
+      const hasCenteredRef = useRef(false);
+      const recenterSignatureRef = useRef('');
+
+      useLayoutEffect(() => {
+        const update = () => {
+          if (!wrapRef.current) return;
+          const rect = wrapRef.current.getBoundingClientRect();
+          setSize({ width: rect.width, height: rect.height });
+        };
+        update();
+        const ro = new ResizeObserver(update);
+        if (wrapRef.current) ro.observe(wrapRef.current);
+        window.addEventListener('resize', update);
+        return () => { ro.disconnect(); window.removeEventListener('resize', update); };
+      }, []);
+
+      const nodeMap = useMemo(() => Object.fromEntries(visibleNodes.map((n) => [n.id, n])), [visibleNodes]);
+
+      const baseViewport = useMemo(() => {
+        const innerW = Math.max(100, size.width - GRAPH_PADDING.left - GRAPH_PADDING.right);
+        const innerH = Math.max(100, size.height - GRAPH_PADDING.top - GRAPH_PADDING.bottom);
+        const fallbackScale = Math.min(innerW / WORLD_WIDTH, innerH / WORLD_HEIGHT);
+        return { fallbackScale, baseOriginX: GRAPH_PADDING.left + innerW / 2, baseOriginY: GRAPH_PADDING.top + innerH / 2, minX: 0, minY: 0, maxX: WORLD_WIDTH, maxY: WORLD_HEIGHT, innerW, innerH };
+      }, [size]);
+
+      const minZoom = 0.7;
+      const maxZoom = 2.4;
+
+      const visibleBounds = useMemo(() => {
+        if (!visibleNodes.length) return null;
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        visibleNodes.forEach((node) => {
+          const r = measureRadius(node, degreeMap[node.id] || 0) + 28;
+          minX = Math.min(minX, node.x - r);
+          minY = Math.min(minY, node.y - r);
+          maxX = Math.max(maxX, node.x + r);
+          maxY = Math.max(maxY, node.y + r);
+        });
+        return { minX, minY, maxX, maxY, width: Math.max(120, maxX - minX), height: Math.max(120, maxY - minY), centerX: (minX + maxX) / 2, centerY: (minY + maxY) / 2 };
+      }, [visibleNodes, degreeMap]);
+
+      const defaultView = useMemo(() => {
+        if (!visibleBounds) return { zoom: 1, panX: 0, panY: 0 };
+        const fitScale = Math.min(baseViewport.innerW / visibleBounds.width, baseViewport.innerH / visibleBounds.height);
+        const targetZoom = clamp(fitScale / baseViewport.fallbackScale, minZoom, maxZoom);
+        return { zoom: targetZoom, panX: -visibleBounds.centerX * baseViewport.fallbackScale * targetZoom, panY: -visibleBounds.centerY * baseViewport.fallbackScale * targetZoom };
+      }, [visibleBounds, baseViewport]);
+
+      const resetView = useCallback(() => setViewState({ zoom: defaultView.zoom, panX: defaultView.panX, panY: defaultView.panY }), [defaultView]);
+
+      useEffect(() => {
+        if (!visibleBounds || !baseViewport.innerW || !baseViewport.innerH) return;
+        const signature = `${visibleNodes.map((n) => n.id).sort().join('|')}::${Math.round(visibleBounds.centerX)}::${Math.round(visibleBounds.centerY)}::${visibleNodes.length}`;
+        if (!hasCenteredRef.current) {
+          hasCenteredRef.current = true;
+          recenterSignatureRef.current = signature;
+          setViewState({ zoom: defaultView.zoom, panX: defaultView.panX, panY: defaultView.panY });
+          return;
+        }
+        if (recenterSignatureRef.current !== signature) {
+          recenterSignatureRef.current = signature;
+          setViewState({ zoom: defaultView.zoom, panX: defaultView.panX, panY: defaultView.panY });
+        }
+      }, [defaultView, visibleBounds, visibleNodes, baseViewport.innerW, baseViewport.innerH]);
+
+      const viewport = useMemo(() => {
+        const zoom = clamp(viewState.zoom, minZoom, maxZoom);
+        return { ...baseViewport, scale: baseViewport.fallbackScale * zoom, originX: baseViewport.baseOriginX + viewState.panX, originY: baseViewport.baseOriginY + viewState.panY, zoom, panX: viewState.panX, panY: viewState.panY };
+      }, [baseViewport, viewState]);
+
+      const toScreen = (node) => ({ x: viewport.originX + node.x * viewport.scale, y: viewport.originY + node.y * viewport.scale });
+
+      const pickNode = (screenX, screenY) => {
+        for (let i = visibleNodes.length - 1; i >= 0; i -= 1) {
+          const n = visibleNodes[i];
+          const r = measureRadius(n, degreeMap[n.id] || 0) * viewport.scale;
+          const p = toScreen(n);
+          if (Math.hypot(screenX - p.x, screenY - p.y) <= r + 8) return n;
+        }
+        return null;
+      };
+
+      const pickEdge = (screenX, screenY) => {
+        let best = null;
+        let bestDistance = 14;
+        visibleEdges.forEach((edge) => {
+          const source = nodeMap[edge.source];
+          const target = nodeMap[edge.target];
+          if (!source || !target) return;
+          const s = toScreen(source);
+          const t = toScreen(target);
+          const dx = t.x - s.x;
+          const dy = t.y - s.y;
+          const lenSq = dx * dx + dy * dy;
+          if (!lenSq) return;
+          const u = Math.max(0, Math.min(1, ((screenX - s.x) * dx + (screenY - s.y) * dy) / lenSq));
+          const px = s.x + u * dx;
+          const py = s.y + u * dy;
+          const dist = Math.hypot(screenX - px, screenY - py);
+          if (dist < bestDistance) {
+            bestDistance = dist;
+            best = edge;
+          }
+        });
+        return best;
+      };
+
+      const clearLongPress = () => {
+        if (gestureRef.current.longPressTimer) {
+          clearTimeout(gestureRef.current.longPressTimer);
+          gestureRef.current.longPressTimer = null;
+        }
+      };
+
+      const applyZoomAtPoint = (nextZoom, focusX, focusY, base = viewState) => {
+        const zoom = clamp(nextZoom, minZoom, maxZoom);
+        const worldX = (focusX - (baseViewport.baseOriginX + base.panX)) / (baseViewport.fallbackScale * base.zoom);
+        const worldY = (focusY - (baseViewport.baseOriginY + base.panY)) / (baseViewport.fallbackScale * base.zoom);
+        const panX = focusX - baseViewport.baseOriginX - worldX * baseViewport.fallbackScale * zoom;
+        const panY = focusY - baseViewport.baseOriginY - worldY * baseViewport.fallbackScale * zoom;
+        return { zoom, panX, panY };
+      };
+
+      const getPinchData = () => {
+        const points = Array.from(gestureRef.current.pointers.values());
+        if (points.length < 2) return null;
+        return { cx: (points[0].x + points[1].x) / 2, cy: (points[0].y + points[1].y) / 2, dist: Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y) };
+      };
+
+      useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas || !size.width || !size.height) return;
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = Math.floor(size.width * dpr);
+        canvas.height = Math.floor(size.height * dpr);
+        canvas.style.width = size.width + 'px';
+        canvas.style.height = size.height + 'px';
+        const ctx = canvas.getContext('2d');
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, size.width, size.height);
+        const now = performance.now();
+
+        visibleEdges.forEach((edge) => {
+          const s = nodeMap[edge.source];
+          const t = nodeMap[edge.target];
+          if (!s || !t) return;
+          const sp = toScreen(s);
+          const tp = toScreen(t);
+          const edgeId = getLinkId(edge.source, edge.target);
+          const selected = selectedEdgeId === edgeId;
+          ctx.beginPath();
+          ctx.moveTo(sp.x, sp.y);
+          ctx.lineTo(tp.x, tp.y);
+          ctx.strokeStyle = selected ? 'rgba(255,255,255,0.48)' : 'rgba(255,255,255,0.12)';
+          ctx.lineWidth = selected ? 2 : 1;
+          ctx.stroke();
+        });
+
+        if (newEdgeAnim) {
+          const s = nodeMap[newEdgeAnim.source];
+          const t = nodeMap[newEdgeAnim.target];
+          if (s && t) {
+            const sp = toScreen(s);
+            const tp = toScreen(t);
+            const progress = Math.min(1, (now - newEdgeAnim.started) / 520);
+            const mx = sp.x + (tp.x - sp.x) * progress;
+            const my = sp.y + (tp.y - sp.y) * progress;
+            ctx.beginPath();
+            ctx.moveTo(sp.x, sp.y);
+            ctx.lineTo(mx, my);
+            ctx.strokeStyle = `rgba(255,255,255,${0.45 - progress * 0.2})`;
+            ctx.lineWidth = 1.8;
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(mx, my, 2.4, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255,255,255,${0.7 - progress * 0.3})`;
+            ctx.fill();
+          }
+        }
+
+        if (linkState?.sourceId && linkState?.currentX != null) {
+          const source = nodeMap[linkState.sourceId];
+          if (source) {
+            const sp = toScreen(source);
+            ctx.beginPath();
+            ctx.moveTo(sp.x, sp.y);
+            ctx.lineTo(linkState.currentX, linkState.currentY);
+            ctx.strokeStyle = 'rgba(255,255,255,0.28)';
+            ctx.lineWidth = 1.35;
+            ctx.setLineDash([7, 7]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+          }
+        }
+
+        visibleNodes.forEach((node) => {
+          const category = categoryMap[node.category];
+          const degree = degreeMap[node.id] || 0;
+          const radius = measureRadius(node, degree) * viewport.scale;
+          const point = toScreen(node);
+          const selected = selectedNodeId === node.id;
+          const isLinkSource = linkState?.sourceId === node.id;
+          const hoveredTarget = linkState?.hoveredTargetId === node.id;
+
+          ctx.beginPath();
+          ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
+          ctx.fillStyle = category?.color || '#8F9BB3';
+          ctx.shadowColor = category?.color || '#8F9BB3';
+          ctx.shadowBlur = isLinkSource ? 14 : selected ? 12 : 5;
+          ctx.fill();
+          ctx.shadowBlur = 0;
+          ctx.lineWidth = hoveredTarget ? 2.4 : isLinkSource ? 2 : selected ? 2 : 1;
+          ctx.strokeStyle = hoveredTarget ? 'rgba(255,255,255,1)' : isLinkSource ? 'rgba(255,255,255,0.98)' : selected ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.14)';
+          ctx.stroke();
+
+          if (selected || isLinkSource) {
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, radius + 4.5, 0, Math.PI * 2);
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = isLinkSource ? 'rgba(255,255,255,0.32)' : 'rgba(255,255,255,0.22)';
+            ctx.stroke();
+          }
+
+          if (isLinkSource) {
+            const pulsePhase = ((now % 900) / 900);
+            const pulseR = radius + 8 + pulsePhase * 10;
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, pulseR, 0, Math.PI * 2);
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = `rgba(255,255,255,${0.25 - pulsePhase * 0.2})`;
+            ctx.stroke();
+          }
+        });
+
+        const placedLabels = [];
+        visibleNodes.forEach((node) => {
+          const degree = degreeMap[node.id] || 0;
+          const radius = measureRadius(node, degree) * viewport.scale;
+          const point = toScreen(node);
+          const selected = selectedNodeId === node.id;
+          const fontSize = clamp(10 * viewport.scale + 2.5, 10, 13);
+          ctx.font = `500 ${fontSize}px Inter, sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'top';
+          ctx.fillStyle = selected ? 'rgba(244,247,255,0.96)' : 'rgba(232,238,252,0.86)';
+          const shortTitle = node.title.length > 18 ? node.title.slice(0, 18) : node.title;
+          const maxWidth = Math.max(radius * 2.8, 56);
+          const label = truncateLabel(ctx, shortTitle, maxWidth);
+          const metrics = ctx.measureText(label);
+          const labelWidth = Math.min(maxWidth, metrics.width);
+          const labelHeight = fontSize + 2;
+          let labelY = point.y + radius + 6;
+          let box = { left: point.x - labelWidth / 2, right: point.x + labelWidth / 2, top: labelY, bottom: labelY + labelHeight };
+          const overlaps = (candidate) => placedLabels.some((p) => !(candidate.right < p.left || candidate.left > p.right || candidate.bottom < p.top || candidate.top > p.bottom));
+          if (overlaps(box) && point.y - radius - 18 > 10) {
+            labelY = point.y - radius - labelHeight - 6;
+            box = { left: point.x - labelWidth / 2, right: point.x + labelWidth / 2, top: labelY, bottom: labelY + labelHeight };
+          }
+          if (!overlaps(box)) {
+            ctx.fillText(label, point.x, labelY);
+            placedLabels.push(box);
+          }
+        });
+      }, [visibleNodes, visibleEdges, size, viewport, degreeMap, categoryMap, selectedNodeId, selectedEdgeId, nodeMap, linkState, newEdgeAnim]);
+
+      const pointerPosition = (event) => {
+        const rect = canvasRef.current.getBoundingClientRect();
+        return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+      };
+
+      const handlePointerDown = (event) => {
+        const pos = pointerPosition(event);
+        gestureRef.current.pointers.set(event.pointerId, pos);
+
+        if (gestureRef.current.pointers.size === 2) {
+          const pinch = getPinchData();
+          if (!pinch) return;
+          gestureRef.current.mode = 'pinch';
+          gestureRef.current.nodeId = null;
+          clearLongPress();
+          gestureRef.current.pinchStartDistance = pinch.dist;
+          gestureRef.current.pinchStartZoom = viewState.zoom;
+          gestureRef.current.pinchStartPan = { x: viewState.panX, y: viewState.panY };
+          return;
+        }
+
+        if (linkState?.sourceId) {
+          const node = pickNode(pos.x, pos.y);
+          if (node && node.id !== linkState.sourceId) onCreateLink(linkState.sourceId, node.id);
+          setLinkState(null);
+          return;
+        }
+
+        const node = pickNode(pos.x, pos.y);
+        if (!node) {
+          const edge = pickEdge(pos.x, pos.y);
+          if (edge) {
+            onSelectEdge(edge);
+            return;
+          }
+        }
+
+        if (node) {
+          const screen = toScreen(node);
+          gestureRef.current.mode = 'node';
+          gestureRef.current.nodeId = node.id;
+          gestureRef.current.offsetX = pos.x - screen.x;
+          gestureRef.current.offsetY = pos.y - screen.y;
+          gestureRef.current.moved = false;
+          gestureRef.current.longPressTriggered = false;
+          clearLongPress();
+          gestureRef.current.longPressTimer = setTimeout(() => {
+            if (gestureRef.current.mode === 'node' && !gestureRef.current.moved) {
+              gestureRef.current.longPressTriggered = true;
+              const n = nodeMap[gestureRef.current.nodeId];
+              const p = n ? toScreen(n) : null;
+              if (p) setLinkState({ sourceId: node.id, currentX: p.x, currentY: p.y, hoveredTargetId: null });
+            }
+          }, 500);
+          canvasRef.current.setPointerCapture(event.pointerId);
+        } else {
+          gestureRef.current.mode = 'pan';
+          gestureRef.current.nodeId = null;
+          gestureRef.current.offsetX = pos.x;
+          gestureRef.current.offsetY = pos.y;
+          gestureRef.current.startPanX = viewState.panX;
+          gestureRef.current.startPanY = viewState.panY;
+          gestureRef.current.moved = false;
+          clearLongPress();
+          canvasRef.current.setPointerCapture(event.pointerId);
+        }
+      };
+
+      const handlePointerMove = (event) => {
+        const pos = pointerPosition(event);
+        if (gestureRef.current.pointers.has(event.pointerId)) gestureRef.current.pointers.set(event.pointerId, pos);
+
+        if (gestureRef.current.mode === 'pinch') {
+          const pinch = getPinchData();
+          if (!pinch || !gestureRef.current.pinchStartDistance) return;
+          const ratio = pinch.dist / gestureRef.current.pinchStartDistance;
+          const base = { zoom: gestureRef.current.pinchStartZoom, panX: gestureRef.current.pinchStartPan.x, panY: gestureRef.current.pinchStartPan.y };
+          setViewState(applyZoomAtPoint(base.zoom * ratio, pinch.cx, pinch.cy, base));
+          return;
+        }
+
+        if (gestureRef.current.mode === 'node' && gestureRef.current.nodeId) {
+          const node = nodeMap[gestureRef.current.nodeId];
+          if (!node) return;
+          const sp = toScreen(node);
+          const dx = pos.x - (sp.x + gestureRef.current.offsetX);
+          const dy = pos.y - (sp.y + gestureRef.current.offsetY);
+          if (Math.abs(dx) > 4 || Math.abs(dy) > 4) clearLongPress();
+
+          if (linkState?.sourceId === gestureRef.current.nodeId) {
+            const hovered = pickNode(pos.x, pos.y);
+            setLinkState((prev) => ({ ...prev, currentX: pos.x, currentY: pos.y, hoveredTargetId: hovered && hovered.id !== prev.sourceId ? hovered.id : null }));
+            return;
+          }
+
+          const nextX = (pos.x - gestureRef.current.offsetX - viewport.originX) / viewport.scale;
+          const nextY = (pos.y - gestureRef.current.offsetY - viewport.originY) / viewport.scale;
+          const r = measureRadius(node, degreeMap[node.id] || 0);
+          gestureRef.current.moved = true;
+          onNodePositionChange(gestureRef.current.nodeId, { x: clamp(nextX, viewport.minX + r, viewport.maxX - r), y: clamp(nextY, viewport.minY + r, viewport.maxY - r) });
+          return;
+        }
+
+        if (gestureRef.current.mode === 'pan') {
+          const dx = pos.x - gestureRef.current.offsetX;
+          const dy = pos.y - gestureRef.current.offsetY;
+          gestureRef.current.moved = true;
+          setViewState((prev) => ({ ...prev, panX: gestureRef.current.startPanX + dx, panY: gestureRef.current.startPanY + dy }));
+        }
+      };
+
+      const endPointer = (event) => {
+        const hadPointer = gestureRef.current.pointers.has(event.pointerId);
+        gestureRef.current.pointers.delete(event.pointerId);
+        clearLongPress();
+
+        if (gestureRef.current.mode === 'pinch') {
+          if (gestureRef.current.pointers.size < 2) gestureRef.current.mode = null;
+        } else if (gestureRef.current.mode === 'node') {
+          const nid = gestureRef.current.nodeId;
+          const wasLink = linkState?.sourceId === nid;
+          if (wasLink) {
+            const pos = pointerPosition(event);
+            const node = pickNode(pos.x, pos.y);
+            if (node && node.id !== nid) onCreateLink(nid, node.id);
+            setLinkState(null);
+          } else if (nid && !gestureRef.current.moved && !gestureRef.current.longPressTriggered) {
+            onNodeClick(nid);
+          }
+          gestureRef.current.mode = null;
+          gestureRef.current.nodeId = null;
+          gestureRef.current.longPressTriggered = false;
+        } else if (gestureRef.current.mode === 'pan') {
+          gestureRef.current.mode = null;
+        }
+
+        if (hadPointer && canvasRef.current?.hasPointerCapture(event.pointerId)) canvasRef.current.releasePointerCapture(event.pointerId);
+      };
+
+      const handleWheel = (event) => {
+        event.preventDefault();
+        const rect = canvasRef.current.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+        const factor = event.deltaY > 0 ? 0.9 : 1.12;
+        setViewState((prev) => applyZoomAtPoint(prev.zoom * factor, x, y, prev));
+      };
+
+      return (
+        <div ref={wrapRef} className="graph-wrap absolute inset-0">
+          <canvas ref={canvasRef} className="graph-canvas" onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={endPointer} onPointerCancel={endPointer} onWheel={handleWheel} />
+          <div className="absolute right-4 top-4 z-10 flex flex-col items-end gap-2">
+            {linkState?.sourceId && (
+              <button type="button" onClick={() => setLinkState(null)} className="chip-base border border-white/10 bg-surface/80 px-3 text-[12px] text-white backdrop-blur">Отменить</button>
+            )}
+            <button type="button" onClick={resetView} className="chip-base border border-white/10 bg-surface/80 px-3 text-[12px] text-textmuted backdrop-blur hover:text-white">Сбросить вид</button>
+          </div>
+        </div>
+      );
+    }
+
+    function App() {
+      const [categories, setCategories] = useState(initialCategories);
+      const [nodes, setNodes] = useState(initialNodes);
+      const [links, setLinks] = useState(initialLinks);
+      const [selectedCategories, setSelectedCategories] = useState(['all']);
+      const [selectedNodeId, setSelectedNodeId] = useState(null);
+      const [selectedEdgeId, setSelectedEdgeId] = useState(null);
+      const [categorySheetOpen, setCategorySheetOpen] = useState(false);
+      const [noteSheetOpen, setNoteSheetOpen] = useState(false);
+      const [noteDetailsOpen, setNoteDetailsOpen] = useState(false);
+      const [editingNodeId, setEditingNodeId] = useState(null);
+      const [categoryForm, setCategoryForm] = useState({ name: '', color: COLOR_PRESETS[0] });
+      const [noteForm, setNoteForm] = useState({ title: '', text: '', category: 'work', date: '', connectTo: [] });
+      const [linkState, setLinkState] = useState(null);
+      const [newEdgeAnim, setNewEdgeAnim] = useState(null);
+      const categoryMap = useMemo(() => categoryMapFrom(categories), [categories]);
+
+      const visibleNodeIds = useMemo(() => {
+        const hasSpecific = selectedCategories.some((id) => id !== 'all');
+        if (!hasSpecific) return new Set(nodes.map((n) => n.id));
+        const activeSet = new Set(selectedCategories.filter((id) => id !== 'all'));
+        return new Set(nodes.filter((n) => activeSet.has(n.category)).map((n) => n.id));
+      }, [nodes, selectedCategories]);
+
+      const visibleNodes = useMemo(() => nodes.filter((node) => visibleNodeIds.has(node.id)), [nodes, visibleNodeIds]);
+      const visibleEdges = useMemo(() => links.filter((edge) => visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target)), [links, visibleNodeIds]);
+      const selectedNode = useMemo(() => nodes.find((n) => n.id === selectedNodeId) || null, [nodes, selectedNodeId]);
+
+      const degreeMap = useMemo(() => {
+        const map = {};
+        nodes.forEach((n) => { map[n.id] = 0; });
+        links.forEach((l) => { map[l.source] = (map[l.source] || 0) + 1; map[l.target] = (map[l.target] || 0) + 1; });
+        return map;
+      }, [nodes, links]);
+
+      useEffect(() => {
+        if (selectedNodeId && !visibleNodeIds.has(selectedNodeId)) setNoteDetailsOpen(false);
+        if (linkState?.sourceId && !visibleNodeIds.has(linkState.sourceId)) setLinkState(null);
+        if (selectedEdgeId) {
+          const exists = links.some((edge) => getLinkId(edge.source, edge.target) === selectedEdgeId && visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target));
+          if (!exists) setSelectedEdgeId(null);
+        }
+      }, [selectedNodeId, visibleNodeIds, linkState, selectedEdgeId, links]);
+
+      const resetNoteForm = () => setNoteForm({ title: '', text: '', category: categories.find((c) => !c.locked)?.id || 'work', date: '', connectTo: [] });
+
+      const saveCategory = () => {
+        const name = categoryForm.name.trim();
+        if (!name) return;
+        const id = 'cat_' + Date.now();
+        setCategories((prev) => [...prev, { id, name, color: categoryForm.color }]);
+        setCategoryForm({ name: '', color: COLOR_PRESETS[0] });
+        setCategorySheetOpen(false);
+      };
+
+      const openNewNote = () => {
+        setEditingNodeId(null);
+        resetNoteForm();
+        setNoteSheetOpen(true);
+      };
+
+      const openEditNote = () => {
+        if (!selectedNode) return;
+        const connectedIds = links.flatMap((l) => {
+          if (l.source === selectedNode.id) return [l.target];
+          if (l.target === selectedNode.id) return [l.source];
+          return [];
+        });
+        setEditingNodeId(selectedNode.id);
+        setNoteForm({ title: selectedNode.title, text: selectedNode.text, category: selectedNode.category, date: selectedNode.date || '', connectTo: connectedIds });
+        setNoteDetailsOpen(false);
+        setNoteSheetOpen(true);
+      };
+
+      const positionNewNode = (existingCount) => {
+        const columns = 4;
+        const cellW = 220;
+        const cellH = 150;
+        return { x: 120 + (existingCount % columns) * cellW, y: 120 + Math.floor(existingCount / columns) * cellH };
+      };
+
+      const saveNote = () => {
+        const title = noteForm.title.trim();
+        const text = noteForm.text.trim();
+        if (!title || !text || !noteForm.category) return;
+
+        if (editingNodeId) {
+          setNodes((prev) => prev.map((n) => n.id === editingNodeId ? { ...n, title, text, category: noteForm.category, date: noteForm.date } : n));
+          setLinks((prev) => {
+            const keep = prev.filter((l) => l.source !== editingNodeId && l.target !== editingNodeId);
+            const rebuilt = noteForm.connectTo.filter((id, idx, arr) => id !== editingNodeId && arr.indexOf(id) === idx).map((id) => ({ source: editingNodeId, target: id }));
+            return [...keep, ...rebuilt];
+          });
+          setSelectedNodeId(editingNodeId);
+        } else {
+          const id = 'n' + Date.now();
+          const pos = positionNewNode(nodes.length);
+          const newNode = { id, title, text, category: noteForm.category, date: noteForm.date, importance: 1 + Math.min(noteForm.connectTo.length * 0.08, 0.35), x: pos.x, y: pos.y };
+          setNodes((prev) => [...prev, newNode]);
+          setLinks((prev) => {
+            const seen = new Set(prev.map((l) => getLinkId(l.source, l.target)));
+            const extra = [];
+            noteForm.connectTo.forEach((target) => {
+              const key = getLinkId(id, target);
+              if (target !== id && !seen.has(key)) { seen.add(key); extra.push({ source: id, target }); }
+            });
+            return [...prev, ...extra];
+          });
+          setSelectedNodeId(id);
+        }
+
+        setNoteSheetOpen(false);
+        setNoteDetailsOpen(true);
+      };
+
+      const deleteNote = () => {
+        if (!selectedNode) return;
+        setNodes((prev) => prev.filter((n) => n.id !== selectedNode.id));
+        setLinks((prev) => prev.filter((l) => l.source !== selectedNode.id && l.target !== selectedNode.id));
+        setSelectedNodeId(null);
+        setNoteDetailsOpen(false);
+      };
+
+      const toggleConnectTo = (id) => {
+        setNoteForm((prev) => ({ ...prev, connectTo: prev.connectTo.includes(id) ? prev.connectTo.filter((item) => item !== id) : [...prev.connectTo, id] }));
+      };
+
+      const handleNodePositionChange = (nodeId, position) => {
+        setNodes((prev) => prev.map((node) => node.id === nodeId ? { ...node, x: position.x, y: position.y } : node));
+      };
+
+      const createLinkBetweenNodes = useCallback((sourceId, targetId) => {
+        if (!sourceId || !targetId || sourceId === targetId) return;
+        const key = getLinkId(sourceId, targetId);
+        const exists = links.some((l) => getLinkId(l.source, l.target) === key);
+        if (!exists) {
+          setLinks((prev) => [...prev, { source: sourceId, target: targetId }]);
+          setNewEdgeAnim({ source: sourceId, target: targetId, started: performance.now() });
+          window.clearTimeout(window.__memoryWebAnim);
+          window.__memoryWebAnim = window.setTimeout(() => setNewEdgeAnim(null), 700);
+        }
+        setLinkState(null);
+      }, [links]);
+
+      const removeSelectedEdge = () => {
+        if (!selectedEdgeId) return;
+        setLinks((prev) => prev.filter((edge) => getLinkId(edge.source, edge.target) !== selectedEdgeId));
+        setSelectedEdgeId(null);
+      };
+
+      const toggleCategoryChip = (categoryId) => {
+        setSelectedCategories((prev) => {
+          if (categoryId === 'all') return ['all'];
+          const base = prev.filter((id) => id !== 'all');
+          const exists = base.includes(categoryId);
+          const next = exists ? base.filter((id) => id !== categoryId) : [...base, categoryId];
+          return next.length ? next : ['all'];
+        });
+        setSelectedEdgeId(null);
+        setSelectedNodeId(null);
+        setNoteDetailsOpen(false);
+      };
+
+      const sideSheet = typeof window !== 'undefined' ? window.innerWidth >= 1024 : false;
+
+      return (
+        <div className="relative flex h-full flex-col bg-bg text-textmain" style={{ paddingTop: 'max(env(safe-area-inset-top), 8px)' }}>
+          <header className="glass-header relative z-20 px-4 pb-3 pt-4">
+            <div className="mb-3 flex items-center justify-between gap-4 pt-1.5">
+              <div>
+                <div className="text-[17px] font-semibold leading-none tracking-[-0.02em] text-white">Memory Web</div>
+                <div className="mt-1 text-[12px] leading-none text-textsoft">Личная сеть заметок и воспоминаний</div>
+              </div>
+            </div>
+            <div className="scrollbar-thin flex items-center gap-2.5 overflow-x-auto pb-1.5 pt-1">
+              {categories.map((category) => (
+                <Chip key={category.id} active={category.id === 'all' ? !selectedCategories.some((id) => id !== 'all') : selectedCategories.includes(category.id)} color={category.color} onClick={() => toggleCategoryChip(category.id)}>
+                  {category.name}
+                </Chip>
+              ))}
+              <Chip plus color="#1f2937" onClick={() => setCategorySheetOpen(true)} />
+            </div>
+          </header>
+
+          <main className="relative flex-1 overflow-hidden">
+            <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-10 bg-gradient-to-b from-bg to-transparent opacity-75" />
+            <GraphCanvas
+              visibleNodes={visibleNodes}
+              visibleEdges={visibleEdges}
+              degreeMap={degreeMap}
+              categoryMap={categoryMap}
+              selectedNodeId={selectedNodeId}
+              selectedEdgeId={selectedEdgeId}
+              linkState={linkState}
+              setLinkState={setLinkState}
+              newEdgeAnim={newEdgeAnim}
+              onNodeClick={(nodeId) => { setSelectedNodeId(nodeId); setSelectedEdgeId(null); setNoteDetailsOpen(true); }}
+              onNodePositionChange={handleNodePositionChange}
+              onCreateLink={createLinkBetweenNodes}
+              onSelectEdge={(edge) => { setSelectedNodeId(null); setNoteDetailsOpen(false); setSelectedEdgeId(getLinkId(edge.source, edge.target)); }}
+            />
+          </main>
+
+          <button onClick={openNewNote} className="circle-icon-button absolute bottom-[max(24px,env(safe-area-inset-bottom)+14px)] right-6 z-20 h-12 w-12 rounded-full border border-white/10 bg-white/[0.92] text-[28px] font-light text-bg shadow-[0_10px_24px_rgba(0,0,0,0.28)] transition hover:scale-[1.02] active:scale-[0.98]" aria-label="Добавить заметку">
+            <span className="fab-plus-glyph" aria-hidden="true">+</span>
+          </button>
+
+          <Sheet open={categorySheetOpen} title="Новая категория" onClose={() => setCategorySheetOpen(false)}>
+            <Field label="Название категории">
+              <Input value={categoryForm.name} onChange={(e) => setCategoryForm((prev) => ({ ...prev, name: e.target.value }))} placeholder="Например, Учёба" />
+            </Field>
+            <Field label="Цвет">
+              <div className="flex flex-wrap gap-3">
+                {COLOR_PRESETS.map((color) => (
+                  <button key={color} onClick={() => setCategoryForm((prev) => ({ ...prev, color }))} className={`h-10 w-10 rounded-full border ${categoryForm.color === color ? 'border-white' : 'border-white/10'}`} style={{ background: color }} aria-label={`Выбрать цвет ${color}`} />
+                ))}
+              </div>
+            </Field>
+            <button onClick={saveCategory} className="mt-3 w-full rounded-[18px] bg-white px-4 py-3.5 text-[15px] font-semibold tracking-[-0.01em] text-bg">Сохранить</button>
+          </Sheet>
+
+          <Sheet open={noteSheetOpen} title={editingNodeId ? 'Редактировать заметку' : 'Новая заметка'} onClose={() => setNoteSheetOpen(false)}>
+            <Field label="Заголовок">
+              <Input value={noteForm.title} onChange={(e) => setNoteForm((prev) => ({ ...prev, title: e.target.value }))} placeholder="Введите заголовок" />
+            </Field>
+            <Field label="Текст заметки">
+              <Textarea value={noteForm.text} onChange={(e) => setNoteForm((prev) => ({ ...prev, text: e.target.value }))} placeholder="Что вы хотите сохранить?" />
+            </Field>
+            <Field label="Категория">
+              <Select value={noteForm.category} onChange={(e) => setNoteForm((prev) => ({ ...prev, category: e.target.value }))}>
+                {categories.filter((c) => !c.locked).map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+              </Select>
+            </Field>
+            <Field label="Дата (необязательно)">
+              <Input type="date" value={noteForm.date} onChange={(e) => setNoteForm((prev) => ({ ...prev, date: e.target.value }))} />
+            </Field>
+            <Field label="Связать с заметками">
+              <div className="flex flex-wrap gap-2.5">
+                {nodes.filter((node) => node.id !== editingNodeId).map((node) => {
+                  const active = noteForm.connectTo.includes(node.id);
+                  const color = categoryMap[node.category]?.color || '#8F9BB3';
+                  return (
+                    <button key={node.id} onClick={() => toggleConnectTo(node.id)} className={`chip-base border px-3.5 text-[12px] tracking-[-0.01em] ${active ? 'text-white' : 'text-textmuted'}`} style={{ background: active ? softMix(color) : 'rgba(255,255,255,0.04)', borderColor: active ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.08)' }}>
+                      {node.title}
+                    </button>
+                  );
+                })}
+              </div>
+            </Field>
+            <button onClick={saveNote} className="mt-3 w-full rounded-[18px] bg-white px-4 py-3.5 text-[15px] font-semibold tracking-[-0.01em] text-bg">Сохранить заметку</button>
+          </Sheet>
+
+          <Sheet open={noteDetailsOpen && !!selectedNode} title="Заметка" onClose={() => setNoteDetailsOpen(false)} side={sideSheet}>
+            {selectedNode && (
+              <div>
+                <div className="mb-3 flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-[18px] font-semibold tracking-[-0.02em] text-white">{selectedNode.title}</h3>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <span className="chip-base px-3 text-[12px] font-medium text-white" style={{ background: softMix(categoryMap[selectedNode.category]?.color || '#8F9BB3') }}>
+                        {categoryMap[selectedNode.category]?.name || 'Без категории'}
+                      </span>
+                      <span className="chip-base border border-white/8 px-3 text-[12px] text-textmuted">{formatDate(selectedNode.date)}</span>
+                    </div>
+                  </div>
+                </div>
+                <p className="mb-6 whitespace-pre-wrap text-[15px] leading-7 text-textmuted">{selectedNode.text}</p>
+                <div className="mb-6">
+                  <div className="mb-2 text-[11px] uppercase tracking-[0.16em] text-textsoft">Связанные заметки</div>
+                  <div className="flex flex-wrap gap-2.5">
+                    {links.flatMap((l) => {
+                      if (l.source === selectedNode.id) return [nodes.find((n) => n.id === l.target)];
+                      if (l.target === selectedNode.id) return [nodes.find((n) => n.id === l.source)];
+                      return [];
+                    }).filter(Boolean).map((node) => (
+                      <button key={node.id} onClick={() => setSelectedNodeId(node.id)} className="chip-base border border-white/8 bg-white/[0.045] px-3.5 text-[12px] text-white">{node.title}</button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <button onClick={openEditNote} className="flex-1 rounded-[18px] border border-white/8 bg-white/[0.045] px-4 py-3.5 text-[14px] font-medium text-white">Редактировать</button>
+                  <button onClick={deleteNote} className="flex-1 rounded-[18px] bg-red-300 px-4 py-3.5 text-[14px] font-semibold text-slate-950">Удалить</button>
                 </div>
               </div>
-              <button onClick={()=>setNoteOpen(false)} style={{background:'none',border:'none',color:'var(--textmuted)',cursor:'pointer',fontSize:20,lineHeight:1,padding:4}}>✕</button>
-            </div>
-            <p style={{fontSize:14,lineHeight:1.7,color:'rgba(255,255,255,0.7)',marginBottom:20}}>{selectedNode.text||'Текст заметки отсутствует.'}</p>
-            <div style={{display:'flex',gap:8}}>
-              <button className="btn btn-ghost" style={{flex:1}} onClick={()=>{setEditForm({title:selectedNode.title,text:selectedNode.text||'',category:selectedNode.category,date:selectedNode.date||''});setEditOpen(true);}}>Редактировать</button>
-              <button className="btn btn-danger" style={{flex:1}} onClick={handleDeleteNode}>Удалить</button>
-            </div>
-          </div>
-        </>
-      )}
+            )}
+          </Sheet>
 
-      {/* Edit note */}
-      {editOpen&&selectedNode&&(
-        <>
-          <div className="sheet-overlay" onClick={()=>setEditOpen(false)}/>
-          <div className={`sheet ${isSideSheet?'':'sheet-lg'}`} style={isSideSheet?{right:0,left:'auto',top:0,bottom:0,width:360,borderRadius:'16px 0 0 16px',borderTop:'none',borderLeft:'1px solid var(--border)',animation:'slideRight 250ms cubic-bezier(0.16,1,0.3,1)'}:{}}>
-            <h3 style={{fontSize:16,fontWeight:600,marginBottom:16}}>Редактировать заметку</h3>
-            <div style={{display:'flex',flexDirection:'column',gap:12}}>
-              <input className="input" placeholder="Заголовок" value={editForm.title} onChange={e=>setEditForm(f=>({...f,title:e.target.value}))}/>
-              <textarea className="input" placeholder="Текст заметки" rows={4} value={editForm.text} onChange={e=>setEditForm(f=>({...f,text:e.target.value}))} style={{resize:'vertical'}}/>
-              <select className="input" value={editForm.category} onChange={e=>setEditForm(f=>({...f,category:e.target.value}))}>
-                {categories.filter(c=>c.id!=='all').map(c=><option key={c.id} value={c.id}>{c.label}</option>)}
-              </select>
-              <input className="input" type="date" value={editForm.date} onChange={e=>setEditForm(f=>({...f,date:e.target.value}))}/>
-              <div style={{display:'flex',gap:8,marginTop:4}}>
-                <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setEditOpen(false)}>Отмена</button>
-                <button className="btn btn-primary" style={{flex:1}} onClick={handleSaveEdit}>Сохранить</button>
+          <Sheet open={!!selectedEdgeId} title="Связь" onClose={() => setSelectedEdgeId(null)}>
+            <div>
+              <p className="mb-5 text-[14px] leading-6 text-textmuted">Удалить только выбранную связь между заметками. Сами заметки останутся на месте.</p>
+              <div className="flex gap-3">
+                <button onClick={() => setSelectedEdgeId(null)} className="flex-1 rounded-[18px] border border-white/8 bg-white/[0.045] px-4 py-3.5 text-[14px] font-medium text-white">Отмена</button>
+                <button onClick={removeSelectedEdge} className="flex-1 rounded-[18px] bg-red-300 px-4 py-3.5 text-[14px] font-semibold text-slate-950">Удалить связь</button>
               </div>
             </div>
-          </div>
-        </>
-      )}
+          </Sheet>
+        </div>
+      );
+    }
 
-      {/* Add category */}
-      {addCatOpen&&(
-        <>
-          <div className="sheet-overlay" onClick={()=>setAddCatOpen(false)}/>
-          <div className="sheet">
-            <h3 style={{fontSize:16,fontWeight:600,marginBottom:16}}>Новая категория</h3>
-            <div style={{display:'flex',flexDirection:'column',gap:14}}>
-              <input className="input" placeholder="Название категории" value={newCatName} onChange={e=>setNewCatName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleAddCategory()}/>
-              <div>
-                <div style={{fontSize:13,color:'var(--textmuted)',marginBottom:10}}>Цвет</div>
-                <ColorPicker value={newCatColor} onChange={setNewCatColor}/>
-              </div>
-              <div style={{display:'flex',gap:8,marginTop:4}}>
-                <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setAddCatOpen(false)}>Отмена</button>
-                <button className="btn btn-primary" style={{flex:1}} onClick={handleAddCategory}>Создать</button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Add note */}
-      {addNoteOpen&&(
-        <>
-          <div className="sheet-overlay" onClick={()=>setAddNoteOpen(false)}/>
-          <div className="sheet sheet-lg">
-            <h3 style={{fontSize:16,fontWeight:600,marginBottom:16}}>Новая заметка</h3>
-            <div style={{display:'flex',flexDirection:'column',gap:12}}>
-              <input className="input" placeholder="Заголовок *" value={noteForm.title} onChange={e=>setNoteForm(f=>({...f,title:e.target.value}))}/>
-              <textarea className="input" placeholder="Текст заметки" rows={4} value={noteForm.text} onChange={e=>setNoteForm(f=>({...f,text:e.target.value}))} style={{resize:'vertical'}}/>
-              <select className="input" value={noteForm.category} onChange={e=>setNoteForm(f=>({...f,category:e.target.value}))}>
-                {categories.filter(c=>c.id!=='all').map(c=><option key={c.id} value={c.id}>{c.label}</option>)}
-              </select>
-              <input className="input" type="date" value={noteForm.date} onChange={e=>setNoteForm(f=>({...f,date:e.target.value}))}/>
-              <div style={{display:'flex',gap:8,marginTop:4}}>
-                <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setAddNoteOpen(false)}>Отмена</button>
-                <button className="btn btn-primary" style={{flex:1}} onClick={handleAddNote}>Добавить</button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
-</script>
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
 </body>
 </html>
