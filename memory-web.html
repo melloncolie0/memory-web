@@ -80,6 +80,16 @@ const INITIAL_EDGES=[
 
 const edgeKey=(a,b)=>[a,b].sort().join('--');
 
+// Distance from point (px,py) to segment (ax,ay)-(bx,by)
+function distToSegment(px,py,ax,ay,bx,by){
+  const dx=bx-ax,dy=by-ay;
+  const lenSq=dx*dx+dy*dy;
+  if(lenSq===0)return Math.hypot(px-ax,py-ay);
+  let t=((px-ax)*dx+(py-ay)*dy)/lenSq;
+  t=Math.max(0,Math.min(1,t));
+  return Math.hypot(px-(ax+t*dx),py-(ay+t*dy));
+}
+
 function Chip({label,color,active,onClick}){
   const style=active
     ?{background:color,color:'#fff',borderColor:color}
@@ -87,7 +97,7 @@ function Chip({label,color,active,onClick}){
   return<button className="chip" style={style} onClick={onClick}>{label}</button>;
 }
 
-function Graph({nodes,edges,categories,onNodeClick,onCreateEdge}){
+function Graph({nodes,edges,categories,onNodeClick,onCreateEdge,onDeleteEdge}){
   const canvasRef=useRef(null);
   const stateRef=useRef({
     pan:{x:0,y:0},scale:1,
@@ -97,9 +107,9 @@ function Graph({nodes,edges,categories,onNodeClick,onCreateEdge}){
     connectMode:false,connectSource:null,
     previewLine:null,
     hoverNode:null,
+    hoverEdge:null,
     positions:{},
     newEdgeAnim:null,newEdgeAnimStart:null,
-    // pinch state
     isPinching:false,pinchDist:null,pinchMidX:0,pinchMidY:0,
     pointerDownPos:null,pointerMoved:false,
   });
@@ -145,6 +155,19 @@ function Graph({nodes,edges,categories,onNodeClick,onCreateEdge}){
     return()=>ro.disconnect();
   },[]);
 
+  // Hit-test an edge — returns edge id or null
+  const hitEdge=useCallback((wx,wy)=>{
+    const st=stateRef.current;
+    const HIT=8/st.scale; // hit area in world coords
+    for(const edge of edges){
+      const pa=st.positions[edge.source],pb=st.positions[edge.target];
+      if(!pa||!pb)continue;
+      const d=distToSegment(wx,wy,pa.x,pa.y,pb.x,pb.y);
+      if(d<=HIT)return edge;
+    }
+    return null;
+  },[edges]);
+
   useEffect(()=>{
     const canvas=canvasRef.current;
     if(!canvas)return;
@@ -169,9 +192,18 @@ function Graph({nodes,edges,categories,onNodeClick,onCreateEdge}){
       const pa=posOf(edge.source),pb=posOf(edge.target);
       if(!pa||!pb)return;
       const isNew=st.newEdgeAnim===edge.id;
+      const isHovered=st.hoverEdge===edge.id;
       ctx.save();
-      ctx.strokeStyle=isNew?`rgba(255,255,255,${0.15+0.55*animProgress})`:'rgba(255,255,255,0.12)';
-      ctx.lineWidth=isNew?1+animProgress:1;
+      if(isHovered){
+        // Glowing highlight for hovered edge
+        ctx.strokeStyle='rgba(248,113,113,0.85)';
+        ctx.lineWidth=2.5;
+        ctx.shadowColor='rgba(248,113,113,0.4)';
+        ctx.shadowBlur=8;
+      } else {
+        ctx.strokeStyle=isNew?`rgba(255,255,255,${0.15+0.55*animProgress})`:'rgba(255,255,255,0.12)';
+        ctx.lineWidth=isNew?1+animProgress:1;
+      }
       ctx.beginPath();
       ctx.moveTo(pa.x,pa.y);
       ctx.lineTo(pb.x,pb.y);
@@ -284,7 +316,7 @@ function Graph({nodes,edges,categories,onNodeClick,onCreateEdge}){
     st.longPressNode=null;
   },[]);
 
-  // ── Touch handlers (attached via useEffect to get passive:false) ──────────
+  // ── Touch handlers ──────────────────────────────────────────────────────
   useEffect(()=>{
     const canvas=canvasRef.current;
     if(!canvas)return;
@@ -302,22 +334,14 @@ function Graph({nodes,edges,categories,onNodeClick,onCreateEdge}){
     const onTouchStart=(e)=>{
       e.preventDefault();
       if(e.touches.length===2){
-        // Two fingers — start pinch, cancel any single-finger state
         cancelLongPress();
-        st.dragging=null;
-        st.panning=false;
-        st.connectMode=false;st.connectSource=null;st.previewLine=null;st.hoverNode=null;
+        st.dragging=null;st.panning=false;
+        st.connectMode=false;st.connectSource=null;st.previewLine=null;st.hoverNode=null;st.hoverEdge=null;
         const{dist,midX,midY}=getPinchInfo(e.touches);
-        st.isPinching=true;
-        st.pinchDist=dist;
-        st.pinchMidX=midX;
-        st.pinchMidY=midY;
-        repaint();
-        return;
+        st.isPinching=true;st.pinchDist=dist;st.pinchMidX=midX;st.pinchMidY=midY;
+        repaint();return;
       }
-      // Single finger
-      st.isPinching=false;
-      st.pinchDist=null;
+      st.isPinching=false;st.pinchDist=null;
       const rect=canvas.getBoundingClientRect();
       const t=e.touches[0];
       const cx=t.clientX-rect.left,cy=t.clientY-rect.top;
@@ -327,18 +351,12 @@ function Graph({nodes,edges,categories,onNodeClick,onCreateEdge}){
         cancelLongPress();
         st.longPressNode=node.id;
         st.longPressTimer=setTimeout(()=>{
-          st.connectMode=true;
-          st.connectSource=node.id;
-          st.dragging=null;
-          repaint();
+          st.connectMode=true;st.connectSource=node.id;st.dragging=null;repaint();
         },500);
         st.dragging={id:node.id,ox:wx-st.positions[node.id].x,oy:wy-st.positions[node.id].y};
-        st.pointerDownPos={cx,cy};
-        st.pointerMoved=false;
+        st.pointerDownPos={cx,cy};st.pointerMoved=false;
       } else {
-        st.panning=true;
-        st.panStart={cx,cy};
-        st.panOrigin={...st.pan};
+        st.panning=true;st.panStart={cx,cy};st.panOrigin={...st.pan};
       }
     };
 
@@ -346,61 +364,40 @@ function Graph({nodes,edges,categories,onNodeClick,onCreateEdge}){
       e.preventDefault();
       if(e.touches.length===2){
         if(!st.isPinching){
-          // Second finger added mid-gesture — start pinch
-          cancelLongPress();
-          st.dragging=null;st.panning=false;
+          cancelLongPress();st.dragging=null;st.panning=false;
           const{dist,midX,midY}=getPinchInfo(e.touches);
-          st.isPinching=true;
-          st.pinchDist=dist;
-          st.pinchMidX=midX;
-          st.pinchMidY=midY;
-          return;
+          st.isPinching=true;st.pinchDist=dist;st.pinchMidX=midX;st.pinchMidY=midY;return;
         }
         const{dist,midX,midY}=getPinchInfo(e.touches);
         if(st.pinchDist!==null){
           const ratio=dist/st.pinchDist;
           const newScale=Math.max(0.3,Math.min(3,st.scale*ratio));
-          // Zoom toward midpoint
-          st.pan={
-            x:midX-(midX-st.pan.x)*(newScale/st.scale),
-            y:midY-(midY-st.pan.y)*(newScale/st.scale),
-          };
+          st.pan={x:midX-(midX-st.pan.x)*(newScale/st.scale),y:midY-(midY-st.pan.y)*(newScale/st.scale)};
           st.scale=newScale;
-          // Also pan if midpoint moved
-          st.pan.x+=midX-st.pinchMidX;
-          st.pan.y+=midY-st.pinchMidY;
+          st.pan.x+=midX-st.pinchMidX;st.pan.y+=midY-st.pinchMidY;
         }
-        st.pinchDist=dist;
-        st.pinchMidX=midX;
-        st.pinchMidY=midY;
-        repaint();
-        return;
+        st.pinchDist=dist;st.pinchMidX=midX;st.pinchMidY=midY;
+        repaint();return;
       }
-      // Single finger
       if(st.isPinching)return;
       const rect=canvas.getBoundingClientRect();
       const t=e.touches[0];
       const cx=t.clientX-rect.left,cy=t.clientY-rect.top;
       const{x:wx,y:wy}=toWorld(cx,cy);
-
       if(st.pointerDownPos){
         const dx=Math.abs(cx-st.pointerDownPos.cx),dy=Math.abs(cy-st.pointerDownPos.cy);
         if(dx>5||dy>5)st.pointerMoved=true;
       }
-
       if(st.connectMode&&st.connectSource){
         cancelLongPress();
         st.previewLine={x:wx,y:wy};
-        const hn=hitNode(wx,wy);
-        st.hoverNode=hn?hn.id:null;
-        repaint();
-        return;
+        const hn=hitNode(wx,wy);st.hoverNode=hn?hn.id:null;
+        repaint();return;
       }
       if(st.dragging&&st.pointerMoved){
         cancelLongPress();
         st.positions[st.dragging.id]={x:wx-st.dragging.ox,y:wy-st.dragging.oy};
-        repaint();
-        return;
+        repaint();return;
       }
       if(st.panning&&st.panStart){
         st.pan={x:st.panOrigin.x+(cx-st.panStart.cx),y:st.panOrigin.y+(cy-st.panStart.cy)};
@@ -412,44 +409,31 @@ function Graph({nodes,edges,categories,onNodeClick,onCreateEdge}){
       e.preventDefault();
       if(e.touches.length<2){
         if(st.isPinching){
-          // Pinch ended
-          st.isPinching=false;
-          st.pinchDist=null;
-          // If one finger remains, don't trigger node actions
-          st.dragging=null;
-          st.panning=false;
-          st.pointerDownPos=null;
-          st.pointerMoved=false;
-          return;
+          st.isPinching=false;st.pinchDist=null;
+          st.dragging=null;st.panning=false;
+          st.pointerDownPos=null;st.pointerMoved=false;return;
         }
       }
       if(st.isPinching)return;
-
       const movedSignificantly=st.pointerMoved;
       let wx=0,wy=0;
       if(e.changedTouches.length>0){
         const rect=canvas.getBoundingClientRect();
         const t=e.changedTouches[0];
         const cx=t.clientX-rect.left,cy=t.clientY-rect.top;
-        const w=toWorld(cx,cy);
-        wx=w.x;wy=w.y;
+        const w=toWorld(cx,cy);wx=w.x;wy=w.y;
       }
-
       if(st.connectMode&&st.connectSource){
         const target=hitNode(wx,wy);
-        if(target&&target.id!==st.connectSource){
-          onCreateEdge(st.connectSource,target.id);
-        }
+        if(target&&target.id!==st.connectSource)onCreateEdge(st.connectSource,target.id);
         st.connectMode=false;st.connectSource=null;st.previewLine=null;st.hoverNode=null;
         repaint();
       } else if(st.dragging&&!movedSignificantly){
         const node=nodes.find(n=>n.id===st.dragging.id);
         if(node){cancelLongPress();onNodeClick(node);}
       }
-
       cancelLongPress();
-      st.dragging=null;
-      st.panning=false;st.panStart=null;st.panOrigin=null;
+      st.dragging=null;st.panning=false;st.panStart=null;st.panOrigin=null;
       st.pointerDownPos=null;st.pointerMoved=false;
     };
 
@@ -463,9 +447,9 @@ function Graph({nodes,edges,categories,onNodeClick,onCreateEdge}){
       canvas.removeEventListener('touchend',onTouchEnd);
       canvas.removeEventListener('touchcancel',onTouchEnd);
     };
-  },[nodes,toWorld,hitNode,cancelLongPress,onNodeClick,onCreateEdge,repaint]);
+  },[nodes,toWorld,hitNode,hitEdge,cancelLongPress,onNodeClick,onCreateEdge,onDeleteEdge,repaint]);
 
-  // ── Mouse handlers ────────────────────────────────────────────────────────
+  // ── Mouse handlers ──────────────────────────────────────────────────────
   const onMouseDown=useCallback((e)=>{
     const st=stateRef.current;
     const canvas=canvasRef.current;
@@ -477,21 +461,14 @@ function Graph({nodes,edges,categories,onNodeClick,onCreateEdge}){
       cancelLongPress();
       st.longPressNode=node.id;
       st.longPressTimer=setTimeout(()=>{
-        st.connectMode=true;
-        st.connectSource=node.id;
-        st.dragging=null;
-        repaint();
+        st.connectMode=true;st.connectSource=node.id;st.dragging=null;repaint();
       },500);
       st.dragging={id:node.id,ox:wx-st.positions[node.id].x,oy:wy-st.positions[node.id].y};
-      st.pointerDownPos={cx,cy};
-      st.pointerMoved=false;
+      st.pointerDownPos={cx,cy};st.pointerMoved=false;
     } else {
-      st.panning=true;
-      st.panStart={cx,cy};
-      st.panOrigin={...st.pan};
+      st.panning=true;st.panStart={cx,cy};st.panOrigin={...st.pan};
       if(st.connectMode){
-        st.connectMode=false;st.connectSource=null;st.previewLine=null;st.hoverNode=null;
-        repaint();
+        st.connectMode=false;st.connectSource=null;st.previewLine=null;st.hoverNode=null;repaint();
       }
     }
   },[toWorld,hitNode,cancelLongPress,repaint]);
@@ -509,20 +486,31 @@ function Graph({nodes,edges,categories,onNodeClick,onCreateEdge}){
     if(st.connectMode&&st.connectSource){
       cancelLongPress();
       st.previewLine={x:wx,y:wy};
-      const hn=hitNode(wx,wy);
-      st.hoverNode=hn?hn.id:null;
+      const hn=hitNode(wx,wy);st.hoverNode=hn?hn.id:null;
       repaint();return;
     }
     if(st.dragging&&st.pointerMoved){
       cancelLongPress();
       st.positions[st.dragging.id]={x:wx-st.dragging.ox,y:wy-st.dragging.oy};
+      st.hoverEdge=null;
       repaint();return;
     }
     if(st.panning&&st.panStart){
       st.pan={x:st.panOrigin.x+(cx-st.panStart.cx),y:st.panOrigin.y+(cy-st.panStart.cy)};
-      repaint();
+      repaint();return;
     }
-  },[toWorld,hitNode,cancelLongPress,repaint]);
+    // Hover edge highlight when idle
+    if(!st.dragging&&!st.panning&&!st.connectMode){
+      const nodeUnder=hitNode(wx,wy);
+      if(!nodeUnder){
+        const edge=hitEdge(wx,wy);
+        const newHover=edge?edge.id:null;
+        if(newHover!==st.hoverEdge){st.hoverEdge=newHover;repaint();}
+      } else if(st.hoverEdge){
+        st.hoverEdge=null;repaint();
+      }
+    }
+  },[toWorld,hitNode,hitEdge,cancelLongPress,repaint]);
 
   const onMouseUp=useCallback((e)=>{
     const st=stateRef.current;
@@ -539,12 +527,15 @@ function Graph({nodes,edges,categories,onNodeClick,onCreateEdge}){
     } else if(st.dragging&&!movedSignificantly){
       const node=nodes.find(n=>n.id===st.dragging.id);
       if(node){cancelLongPress();onNodeClick(node);}
+    } else if(!st.dragging&&!movedSignificantly&&!st.panning){
+      // Click on empty canvas — check edge hit
+      const edge=hitEdge(wx,wy);
+      if(edge)onDeleteEdge(edge);
     }
     cancelLongPress();
-    st.dragging=null;
-    st.panning=false;st.panStart=null;st.panOrigin=null;
+    st.dragging=null;st.panning=false;st.panStart=null;st.panOrigin=null;
     st.pointerDownPos=null;st.pointerMoved=false;
-  },[toWorld,hitNode,nodes,onNodeClick,onCreateEdge,cancelLongPress,repaint]);
+  },[toWorld,hitNode,hitEdge,nodes,onNodeClick,onCreateEdge,onDeleteEdge,cancelLongPress,repaint]);
 
   const onWheel=useCallback((e)=>{
     e.preventDefault();
@@ -561,8 +552,7 @@ function Graph({nodes,edges,categories,onNodeClick,onCreateEdge}){
 
   Graph.triggerEdgeAnim=(edgeId)=>{
     const st=stateRef.current;
-    st.newEdgeAnim=edgeId;
-    st.newEdgeAnimStart=Date.now();
+    st.newEdgeAnim=edgeId;st.newEdgeAnimStart=Date.now();
   };
 
   return(
@@ -588,6 +578,7 @@ function App(){
   const [addCatOpen,setAddCatOpen]=useState(false);
   const [addNoteOpen,setAddNoteOpen]=useState(false);
   const [editOpen,setEditOpen]=useState(false);
+  const [deleteEdgeTarget,setDeleteEdgeTarget]=useState(null);
   const [newCatName,setNewCatName]=useState('');
   const [newCatColor,setNewCatColor]=useState(PRESET_COLORS[0]);
   const [noteForm,setNoteForm]=useState({title:'',text:'',category:'work',date:''});
@@ -615,8 +606,7 @@ function App(){
   const visibleEdges=useMemo(()=>edges.filter(e=>visibleIds.has(e.source)&&visibleIds.has(e.target)),[edges,visibleIds]);
 
   const handleNodeClick=useCallback((node)=>{
-    setSelectedNode(node);
-    setNoteOpen(true);
+    setSelectedNode(node);setNoteOpen(true);
   },[]);
 
   const handleCreateEdge=useCallback((sourceId,targetId)=>{
@@ -627,6 +617,17 @@ function App(){
     setEdges(prev=>[...prev,newEdge]);
     setTimeout(()=>Graph.triggerEdgeAnim&&Graph.triggerEdgeAnim(newEdge.id),30);
   },[edges]);
+
+  // Called when user taps/clicks an edge
+  const handleDeleteEdgeRequest=useCallback((edge)=>{
+    setDeleteEdgeTarget(edge);
+  },[]);
+
+  const confirmDeleteEdge=useCallback(()=>{
+    if(!deleteEdgeTarget)return;
+    setEdges(prev=>prev.filter(e=>e.id!==deleteEdgeTarget.id));
+    setDeleteEdgeTarget(null);
+  },[deleteEdgeTarget]);
 
   const handleDeleteNode=useCallback(()=>{
     if(!selectedNode)return;
@@ -665,6 +666,14 @@ function App(){
 
   const catOf=useCallback((id)=>categories.find(c=>c.id===id),[categories]);
 
+  // Derive node names for the delete-edge dialog
+  const edgeNodeNames=useMemo(()=>{
+    if(!deleteEdgeTarget)return{a:'',b:''};
+    const a=nodes.find(n=>n.id===deleteEdgeTarget.source);
+    const b=nodes.find(n=>n.id===deleteEdgeTarget.target);
+    return{a:a?.title||'',b:b?.title||''};
+  },[deleteEdgeTarget,nodes]);
+
   return(
     <div style={{display:'flex',flexDirection:'column',height:'100%',background:'#0f0f11'}}>
       <div style={{padding:'12px 16px 8px',borderBottom:'1px solid #1a1a22',flexShrink:0}}>
@@ -694,10 +703,28 @@ function App(){
           categories={categories}
           onNodeClick={handleNodeClick}
           onCreateEdge={handleCreateEdge}
+          onDeleteEdge={handleDeleteEdgeRequest}
         />
-        <div className="connect-hint">Удерживай узел для создания связи</div>
+        <div className="connect-hint">Удерживай узел для создания связи · Нажми на линию для удаления</div>
         <button className="fab" onClick={()=>setAddNoteOpen(true)} title="Добавить заметку">+</button>
       </div>
+
+      {/* Delete edge confirmation */}
+      {deleteEdgeTarget&&(
+        <div className="sheet-overlay" onClick={e=>{if(e.target===e.currentTarget)setDeleteEdgeTarget(null);}}>
+          <div className="sheet">
+            <div className="sheet-handle"/>
+            <h3 style={{marginBottom:10}}>Удалить связь?</h3>
+            <p style={{color:'#888',fontSize:13,marginBottom:20,lineHeight:1.5}}>
+              Связь между <span style={{color:'#e2e2e2',fontWeight:500}}>«{edgeNodeNames.a}»</span> и <span style={{color:'#e2e2e2',fontWeight:500}}>«{edgeNodeNames.b}»</span> будет удалена.
+            </p>
+            <div style={{display:'flex',gap:10}}>
+              <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setDeleteEdgeTarget(null)}>Отмена</button>
+              <button className="btn btn-danger" style={{flex:1}} onClick={confirmDeleteEdge}>Удалить</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {noteOpen&&selectedNode&&(
         <div className="sheet-overlay" onClick={e=>{if(e.target===e.currentTarget)setNoteOpen(false);}}>
