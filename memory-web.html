@@ -87,7 +87,7 @@ function Chip({label,color,active,onClick}){
   return<button className="chip" style={style} onClick={onClick}>{label}</button>;
 }
 
-function Graph({nodes,edges,categories,onNodeClick,onEdgeClick,onCreateEdge}){
+function Graph({nodes,edges,categories,onNodeClick,onCreateEdge}){
   const canvasRef=useRef(null);
   const stateRef=useRef({
     pan:{x:0,y:0},scale:1,
@@ -99,7 +99,8 @@ function Graph({nodes,edges,categories,onNodeClick,onEdgeClick,onCreateEdge}){
     hoverNode:null,
     positions:{},
     newEdgeAnim:null,newEdgeAnimStart:null,
-    pinchDist:null,
+    // pinch state
+    isPinching:false,pinchDist:null,pinchMidX:0,pinchMidY:0,
     pointerDownPos:null,pointerMoved:false,
   });
   const [tick,setTick]=useState(0);
@@ -168,14 +169,9 @@ function Graph({nodes,edges,categories,onNodeClick,onEdgeClick,onCreateEdge}){
       const pa=posOf(edge.source),pb=posOf(edge.target);
       if(!pa||!pb)return;
       const isNew=st.newEdgeAnim===edge.id;
-      const isSelected=edge.id===stateRef.current?.selectedEdgeId;
       ctx.save();
-      ctx.strokeStyle=isSelected?'rgba(255,255,255,0.7)':'rgba(255,255,255,0.12)';
-      ctx.lineWidth=isSelected?2:1;
-      if(isNew){
-        ctx.strokeStyle=`rgba(255,255,255,${0.15+0.55*animProgress})`;
-        ctx.lineWidth=1+animProgress;
-      }
+      ctx.strokeStyle=isNew?`rgba(255,255,255,${0.15+0.55*animProgress})`:'rgba(255,255,255,0.12)';
+      ctx.lineWidth=isNew?1+animProgress:1;
       ctx.beginPath();
       ctx.moveTo(pa.x,pa.y);
       ctx.lineTo(pb.x,pb.y);
@@ -288,23 +284,195 @@ function Graph({nodes,edges,categories,onNodeClick,onEdgeClick,onCreateEdge}){
     st.longPressNode=null;
   },[]);
 
-  const getEventPos=useCallback((e)=>{
+  // ── Touch handlers (attached via useEffect to get passive:false) ──────────
+  useEffect(()=>{
+    const canvas=canvasRef.current;
+    if(!canvas)return;
+    const st=stateRef.current;
+
+    const getPinchInfo=(touches)=>{
+      const t0=touches[0],t1=touches[1];
+      const rect=canvas.getBoundingClientRect();
+      const dist=Math.hypot(t1.clientX-t0.clientX,t1.clientY-t0.clientY);
+      const midX=(t0.clientX+t1.clientX)/2-rect.left;
+      const midY=(t0.clientY+t1.clientY)/2-rect.top;
+      return{dist,midX,midY};
+    };
+
+    const onTouchStart=(e)=>{
+      e.preventDefault();
+      if(e.touches.length===2){
+        // Two fingers — start pinch, cancel any single-finger state
+        cancelLongPress();
+        st.dragging=null;
+        st.panning=false;
+        st.connectMode=false;st.connectSource=null;st.previewLine=null;st.hoverNode=null;
+        const{dist,midX,midY}=getPinchInfo(e.touches);
+        st.isPinching=true;
+        st.pinchDist=dist;
+        st.pinchMidX=midX;
+        st.pinchMidY=midY;
+        repaint();
+        return;
+      }
+      // Single finger
+      st.isPinching=false;
+      st.pinchDist=null;
+      const rect=canvas.getBoundingClientRect();
+      const t=e.touches[0];
+      const cx=t.clientX-rect.left,cy=t.clientY-rect.top;
+      const{x:wx,y:wy}=toWorld(cx,cy);
+      const node=hitNode(wx,wy);
+      if(node){
+        cancelLongPress();
+        st.longPressNode=node.id;
+        st.longPressTimer=setTimeout(()=>{
+          st.connectMode=true;
+          st.connectSource=node.id;
+          st.dragging=null;
+          repaint();
+        },500);
+        st.dragging={id:node.id,ox:wx-st.positions[node.id].x,oy:wy-st.positions[node.id].y};
+        st.pointerDownPos={cx,cy};
+        st.pointerMoved=false;
+      } else {
+        st.panning=true;
+        st.panStart={cx,cy};
+        st.panOrigin={...st.pan};
+      }
+    };
+
+    const onTouchMove=(e)=>{
+      e.preventDefault();
+      if(e.touches.length===2){
+        if(!st.isPinching){
+          // Second finger added mid-gesture — start pinch
+          cancelLongPress();
+          st.dragging=null;st.panning=false;
+          const{dist,midX,midY}=getPinchInfo(e.touches);
+          st.isPinching=true;
+          st.pinchDist=dist;
+          st.pinchMidX=midX;
+          st.pinchMidY=midY;
+          return;
+        }
+        const{dist,midX,midY}=getPinchInfo(e.touches);
+        if(st.pinchDist!==null){
+          const ratio=dist/st.pinchDist;
+          const newScale=Math.max(0.3,Math.min(3,st.scale*ratio));
+          // Zoom toward midpoint
+          st.pan={
+            x:midX-(midX-st.pan.x)*(newScale/st.scale),
+            y:midY-(midY-st.pan.y)*(newScale/st.scale),
+          };
+          st.scale=newScale;
+          // Also pan if midpoint moved
+          st.pan.x+=midX-st.pinchMidX;
+          st.pan.y+=midY-st.pinchMidY;
+        }
+        st.pinchDist=dist;
+        st.pinchMidX=midX;
+        st.pinchMidY=midY;
+        repaint();
+        return;
+      }
+      // Single finger
+      if(st.isPinching)return;
+      const rect=canvas.getBoundingClientRect();
+      const t=e.touches[0];
+      const cx=t.clientX-rect.left,cy=t.clientY-rect.top;
+      const{x:wx,y:wy}=toWorld(cx,cy);
+
+      if(st.pointerDownPos){
+        const dx=Math.abs(cx-st.pointerDownPos.cx),dy=Math.abs(cy-st.pointerDownPos.cy);
+        if(dx>5||dy>5)st.pointerMoved=true;
+      }
+
+      if(st.connectMode&&st.connectSource){
+        cancelLongPress();
+        st.previewLine={x:wx,y:wy};
+        const hn=hitNode(wx,wy);
+        st.hoverNode=hn?hn.id:null;
+        repaint();
+        return;
+      }
+      if(st.dragging&&st.pointerMoved){
+        cancelLongPress();
+        st.positions[st.dragging.id]={x:wx-st.dragging.ox,y:wy-st.dragging.oy};
+        repaint();
+        return;
+      }
+      if(st.panning&&st.panStart){
+        st.pan={x:st.panOrigin.x+(cx-st.panStart.cx),y:st.panOrigin.y+(cy-st.panStart.cy)};
+        repaint();
+      }
+    };
+
+    const onTouchEnd=(e)=>{
+      e.preventDefault();
+      if(e.touches.length<2){
+        if(st.isPinching){
+          // Pinch ended
+          st.isPinching=false;
+          st.pinchDist=null;
+          // If one finger remains, don't trigger node actions
+          st.dragging=null;
+          st.panning=false;
+          st.pointerDownPos=null;
+          st.pointerMoved=false;
+          return;
+        }
+      }
+      if(st.isPinching)return;
+
+      const movedSignificantly=st.pointerMoved;
+      let wx=0,wy=0;
+      if(e.changedTouches.length>0){
+        const rect=canvas.getBoundingClientRect();
+        const t=e.changedTouches[0];
+        const cx=t.clientX-rect.left,cy=t.clientY-rect.top;
+        const w=toWorld(cx,cy);
+        wx=w.x;wy=w.y;
+      }
+
+      if(st.connectMode&&st.connectSource){
+        const target=hitNode(wx,wy);
+        if(target&&target.id!==st.connectSource){
+          onCreateEdge(st.connectSource,target.id);
+        }
+        st.connectMode=false;st.connectSource=null;st.previewLine=null;st.hoverNode=null;
+        repaint();
+      } else if(st.dragging&&!movedSignificantly){
+        const node=nodes.find(n=>n.id===st.dragging.id);
+        if(node){cancelLongPress();onNodeClick(node);}
+      }
+
+      cancelLongPress();
+      st.dragging=null;
+      st.panning=false;st.panStart=null;st.panOrigin=null;
+      st.pointerDownPos=null;st.pointerMoved=false;
+    };
+
+    canvas.addEventListener('touchstart',onTouchStart,{passive:false});
+    canvas.addEventListener('touchmove',onTouchMove,{passive:false});
+    canvas.addEventListener('touchend',onTouchEnd,{passive:false});
+    canvas.addEventListener('touchcancel',onTouchEnd,{passive:false});
+    return()=>{
+      canvas.removeEventListener('touchstart',onTouchStart);
+      canvas.removeEventListener('touchmove',onTouchMove);
+      canvas.removeEventListener('touchend',onTouchEnd);
+      canvas.removeEventListener('touchcancel',onTouchEnd);
+    };
+  },[nodes,toWorld,hitNode,cancelLongPress,onNodeClick,onCreateEdge,repaint]);
+
+  // ── Mouse handlers ────────────────────────────────────────────────────────
+  const onMouseDown=useCallback((e)=>{
+    const st=stateRef.current;
     const canvas=canvasRef.current;
     const rect=canvas.getBoundingClientRect();
-    if(e.touches&&e.touches.length>=2){
-      const t0=e.touches[0],t1=e.touches[1];
-      return{cx:(t0.clientX+t1.clientX)/2-rect.left,cy:(t0.clientY+t1.clientY)/2-rect.top};
-    }
-    const touch=e.touches?e.touches[0]:e;
-    return{cx:touch.clientX-rect.left,cy:touch.clientY-rect.top};
-  },[]);
-
-  const onPointerDown=useCallback((e)=>{
-    const st=stateRef.current;
-    const{cx,cy}=getEventPos(e);
+    const cx=e.clientX-rect.left,cy=e.clientY-rect.top;
     const{x:wx,y:wy}=toWorld(cx,cy);
     const node=hitNode(wx,wy);
-
     if(node){
       cancelLongPress();
       st.longPressNode=node.id;
@@ -326,90 +494,57 @@ function Graph({nodes,edges,categories,onNodeClick,onEdgeClick,onCreateEdge}){
         repaint();
       }
     }
-  },[getEventPos,toWorld,hitNode,cancelLongPress,repaint]);
+  },[toWorld,hitNode,cancelLongPress,repaint]);
 
-  const onPointerMove=useCallback((e)=>{
+  const onMouseMove=useCallback((e)=>{
     const st=stateRef.current;
-
-    if(e.touches&&e.touches.length===2){
-      const t0=e.touches[0],t1=e.touches[1];
-      const dist=Math.hypot(t1.clientX-t0.clientX,t1.clientY-t0.clientY);
-      if(st.pinchDist!==null){
-        const ratio=dist/st.pinchDist;
-        const canvas=canvasRef.current;
-        const rect=canvas.getBoundingClientRect();
-        const cx=(t0.clientX+t1.clientX)/2-rect.left;
-        const cy=(t0.clientY+t1.clientY)/2-rect.top;
-        const newScale=Math.max(0.3,Math.min(4,st.scale*ratio));
-        st.pan={x:cx-(cx-st.pan.x)*(newScale/st.scale),y:cy-(cy-st.pan.y)*(newScale/st.scale)};
-        st.scale=newScale;
-        repaint();
-      }
-      st.pinchDist=dist;
-      return;
-    }
-    st.pinchDist=null;
-
-    const{cx,cy}=getEventPos(e);
+    const canvas=canvasRef.current;
+    const rect=canvas.getBoundingClientRect();
+    const cx=e.clientX-rect.left,cy=e.clientY-rect.top;
     const{x:wx,y:wy}=toWorld(cx,cy);
-
     if(st.pointerDownPos){
       const dx=Math.abs(cx-st.pointerDownPos.cx),dy=Math.abs(cy-st.pointerDownPos.cy);
       if(dx>5||dy>5)st.pointerMoved=true;
     }
-
     if(st.connectMode&&st.connectSource){
       cancelLongPress();
       st.previewLine={x:wx,y:wy};
       const hn=hitNode(wx,wy);
       st.hoverNode=hn?hn.id:null;
-      repaint();
-      return;
+      repaint();return;
     }
-
-    if(st.dragging){
-      if(st.pointerMoved){
-        cancelLongPress();
-        st.positions[st.dragging.id]={x:wx-st.dragging.ox,y:wy-st.dragging.oy};
-        repaint();
-      }
-      return;
+    if(st.dragging&&st.pointerMoved){
+      cancelLongPress();
+      st.positions[st.dragging.id]={x:wx-st.dragging.ox,y:wy-st.dragging.oy};
+      repaint();return;
     }
-
     if(st.panning&&st.panStart){
       st.pan={x:st.panOrigin.x+(cx-st.panStart.cx),y:st.panOrigin.y+(cy-st.panStart.cy)};
       repaint();
     }
-  },[getEventPos,toWorld,hitNode,cancelLongPress,repaint]);
+  },[toWorld,hitNode,cancelLongPress,repaint]);
 
-  const onPointerUp=useCallback((e)=>{
+  const onMouseUp=useCallback((e)=>{
     const st=stateRef.current;
-    st.pinchDist=null;
-    const{cx,cy}=getEventPos(e);
+    const canvas=canvasRef.current;
+    const rect=canvas.getBoundingClientRect();
+    const cx=e.clientX-rect.left,cy=e.clientY-rect.top;
     const{x:wx,y:wy}=toWorld(cx,cy);
     const movedSignificantly=st.pointerMoved;
-
     if(st.connectMode&&st.connectSource){
       const target=hitNode(wx,wy);
-      if(target&&target.id!==st.connectSource){
-        const src=st.connectSource;
-        onCreateEdge(src,target.id);
-      }
+      if(target&&target.id!==st.connectSource)onCreateEdge(st.connectSource,target.id);
       st.connectMode=false;st.connectSource=null;st.previewLine=null;st.hoverNode=null;
       repaint();
     } else if(st.dragging&&!movedSignificantly){
       const node=nodes.find(n=>n.id===st.dragging.id);
-      if(node){
-        cancelLongPress();
-        onNodeClick(node);
-      }
+      if(node){cancelLongPress();onNodeClick(node);}
     }
-
     cancelLongPress();
     st.dragging=null;
     st.panning=false;st.panStart=null;st.panOrigin=null;
     st.pointerDownPos=null;st.pointerMoved=false;
-  },[getEventPos,toWorld,hitNode,nodes,onNodeClick,onCreateEdge,cancelLongPress,repaint]);
+  },[toWorld,hitNode,nodes,onNodeClick,onCreateEdge,cancelLongPress,repaint]);
 
   const onWheel=useCallback((e)=>{
     e.preventDefault();
@@ -418,7 +553,7 @@ function Graph({nodes,edges,categories,onNodeClick,onEdgeClick,onCreateEdge}){
     const rect=canvas.getBoundingClientRect();
     const cx=e.clientX-rect.left,cy=e.clientY-rect.top;
     const delta=e.deltaY>0?0.9:1.1;
-    const newScale=Math.max(0.3,Math.min(4,st.scale*delta));
+    const newScale=Math.max(0.3,Math.min(3,st.scale*delta));
     st.pan={x:cx-(cx-st.pan.x)*(newScale/st.scale),y:cy-(cy-st.pan.y)*(newScale/st.scale)};
     st.scale=newScale;
     repaint();
@@ -434,14 +569,11 @@ function Graph({nodes,edges,categories,onNodeClick,onEdgeClick,onCreateEdge}){
     <canvas
       ref={canvasRef}
       style={{width:'100%',height:'100%',display:'block',touchAction:'none'}}
-      onMouseDown={onPointerDown}
-      onMouseMove={onPointerMove}
-      onMouseUp={onPointerUp}
-      onMouseLeave={onPointerUp}
+      onMouseDown={onMouseDown}
+      onMouseMove={onMouseMove}
+      onMouseUp={onMouseUp}
+      onMouseLeave={onMouseUp}
       onWheel={onWheel}
-      onTouchStart={e=>{e.preventDefault();onPointerDown(e);}}
-      onTouchMove={e=>{e.preventDefault();onPointerMove(e);}}
-      onTouchEnd={e=>{e.preventDefault();onPointerUp(e);}}
     />
   );
 }
