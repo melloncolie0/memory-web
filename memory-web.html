@@ -80,7 +80,6 @@ const INITIAL_EDGES=[
 
 const edgeKey=(a,b)=>[a,b].sort().join('--');
 
-// ── Chip ─────────────────────────────────────────────────────────────────
 function Chip({label,color,active,onClick}){
   const style=active
     ?{background:color,color:'#fff',borderColor:color}
@@ -88,7 +87,6 @@ function Chip({label,color,active,onClick}){
   return<button className="chip" style={style} onClick={onClick}>{label}</button>;
 }
 
-// ── Graph Canvas ──────────────────────────────────────────────────────────
 function Graph({nodes,edges,categories,onNodeClick,onEdgeClick,onCreateEdge}){
   const canvasRef=useRef(null);
   const stateRef=useRef({
@@ -114,7 +112,6 @@ function Graph({nodes,edges,categories,onNodeClick,onEdgeClick,onCreateEdge}){
     return 18+Math.min(conns,6)*2;
   },[edges]);
 
-  // Init positions
   useEffect(()=>{
     const st=stateRef.current;
     const canvas=canvasRef.current;
@@ -133,7 +130,6 @@ function Graph({nodes,edges,categories,onNodeClick,onEdgeClick,onCreateEdge}){
     });
   },[nodes]);
 
-  // Resize
   useEffect(()=>{
     const canvas=canvasRef.current;
     if(!canvas)return;
@@ -148,7 +144,6 @@ function Graph({nodes,edges,categories,onNodeClick,onEdgeClick,onCreateEdge}){
     return()=>ro.disconnect();
   },[]);
 
-  // Draw
   useEffect(()=>{
     const canvas=canvasRef.current;
     if(!canvas)return;
@@ -162,7 +157,6 @@ function Graph({nodes,edges,categories,onNodeClick,onEdgeClick,onCreateEdge}){
 
     const posOf=id=>st.positions[id];
 
-    // Animate new edge
     let animProgress=1;
     if(st.newEdgeAnim&&st.newEdgeAnimStart){
       const elapsed=Date.now()-st.newEdgeAnimStart;
@@ -170,7 +164,6 @@ function Graph({nodes,edges,categories,onNodeClick,onEdgeClick,onCreateEdge}){
       if(animProgress<1)setTimeout(repaint,16);
     }
 
-    // Edges
     edges.forEach(edge=>{
       const pa=posOf(edge.source),pb=posOf(edge.target);
       if(!pa||!pb)return;
@@ -190,7 +183,6 @@ function Graph({nodes,edges,categories,onNodeClick,onEdgeClick,onCreateEdge}){
       ctx.restore();
     });
 
-    // Preview connection line
     if(st.connectMode&&st.connectSource&&st.previewLine){
       const src=posOf(st.connectSource);
       if(src){
@@ -209,7 +201,6 @@ function Graph({nodes,edges,categories,onNodeClick,onEdgeClick,onCreateEdge}){
       }
     }
 
-    // Nodes
     nodes.forEach(node=>{
       const pos=posOf(node.id);
       if(!pos)return;
@@ -219,7 +210,6 @@ function Graph({nodes,edges,categories,onNodeClick,onEdgeClick,onCreateEdge}){
       const isConnSrc=st.connectMode&&st.connectSource===node.id;
       const isHovered=st.hoverNode===node.id;
 
-      // Pulse ring for connection source
       if(isConnSrc){
         ctx.save();
         const pulse=0.5+0.5*Math.sin(Date.now()/180);
@@ -232,7 +222,6 @@ function Graph({nodes,edges,categories,onNodeClick,onEdgeClick,onCreateEdge}){
         setTimeout(repaint,30);
       }
 
-      // Hover highlight for potential target
       if(isHovered&&!isConnSrc){
         ctx.save();
         ctx.strokeStyle='rgba(255,255,255,0.6)';
@@ -243,7 +232,6 @@ function Graph({nodes,edges,categories,onNodeClick,onEdgeClick,onCreateEdge}){
         ctx.restore();
       }
 
-      // Fill
       ctx.save();
       ctx.fillStyle=color;
       ctx.beginPath();
@@ -251,7 +239,6 @@ function Graph({nodes,edges,categories,onNodeClick,onEdgeClick,onCreateEdge}){
       ctx.fill();
       ctx.restore();
 
-      // Stroke
       ctx.save();
       ctx.strokeStyle=isHovered?color:`${color}88`;
       ctx.lineWidth=isHovered?2:1.5;
@@ -260,12 +247,11 @@ function Graph({nodes,edges,categories,onNodeClick,onEdgeClick,onCreateEdge}){
       ctx.stroke();
       ctx.restore();
 
-      // Label — fixed size, always visible
       ctx.save();
       ctx.fillStyle='rgba(255,255,255,0.88)';
       ctx.shadowColor='rgba(0,0,0,0.6)';
       ctx.shadowBlur=3;
-      ctx.font='500 11px Inter,system-ui,sans-serif';
+      ctx.font='500 13px Inter,system-ui,sans-serif';
       ctx.textAlign='center';
       ctx.textBaseline='middle';
       const maxW=r*1.7;
@@ -345,7 +331,6 @@ function Graph({nodes,edges,categories,onNodeClick,onEdgeClick,onCreateEdge}){
   const onPointerMove=useCallback((e)=>{
     const st=stateRef.current;
 
-    // Pinch-to-zoom
     if(e.touches&&e.touches.length===2){
       const t0=e.touches[0],t1=e.touches[1];
       const dist=Math.hypot(t1.clientX-t0.clientX,t1.clientY-t0.clientY);
@@ -439,7 +424,6 @@ function Graph({nodes,edges,categories,onNodeClick,onEdgeClick,onCreateEdge}){
     repaint();
   },[repaint]);
 
-  // Expose newEdgeAnim setter
   Graph.triggerEdgeAnim=(edgeId)=>{
     const st=stateRef.current;
     st.newEdgeAnim=edgeId;
@@ -462,7 +446,6 @@ function Graph({nodes,edges,categories,onNodeClick,onEdgeClick,onCreateEdge}){
   );
 }
 
-// ── App ───────────────────────────────────────────────────────────────────
 function App(){
   const [nodes,setNodes]=useState(INITIAL_NODES);
   const [edges,setEdges]=useState(INITIAL_EDGES);
@@ -552,7 +535,6 @@ function App(){
 
   return(
     <div style={{display:'flex',flexDirection:'column',height:'100%',background:'#0f0f11'}}>
-      {/* Top bar */}
       <div style={{padding:'12px 16px 8px',borderBottom:'1px solid #1a1a22',flexShrink:0}}>
         <div style={{display:'flex',gap:8,overflowX:'auto',paddingBottom:4,scrollbarWidth:'none'}}>
           <button
@@ -573,7 +555,6 @@ function App(){
         </div>
       </div>
 
-      {/* Canvas */}
       <div style={{flex:1,position:'relative',overflow:'hidden'}}>
         <Graph
           nodes={visibleNodes}
@@ -582,13 +563,10 @@ function App(){
           onNodeClick={handleNodeClick}
           onCreateEdge={handleCreateEdge}
         />
-        {/* Long-press hint */}
         <div className="connect-hint">Удерживай узел для создания связи</div>
-        {/* FAB */}
         <button className="fab" onClick={()=>setAddNoteOpen(true)} title="Добавить заметку">+</button>
       </div>
 
-      {/* Note detail sheet */}
       {noteOpen&&selectedNode&&(
         <div className="sheet-overlay" onClick={e=>{if(e.target===e.currentTarget)setNoteOpen(false);}}>
           <div className="sheet" style={{maxHeight:'80vh',overflowY:'auto'}}>
@@ -611,7 +589,6 @@ function App(){
         </div>
       )}
 
-      {/* Edit sheet */}
       {editOpen&&(
         <div className="sheet-overlay" onClick={e=>{if(e.target===e.currentTarget)setEditOpen(false);}}>
           <div className="sheet">
@@ -633,7 +610,6 @@ function App(){
         </div>
       )}
 
-      {/* Add note sheet */}
       {addNoteOpen&&(
         <div className="sheet-overlay" onClick={e=>{if(e.target===e.currentTarget)setAddNoteOpen(false);}}>
           <div className="sheet">
@@ -655,7 +631,6 @@ function App(){
         </div>
       )}
 
-      {/* Add category sheet */}
       {addCatOpen&&(
         <div className="sheet-overlay" onClick={e=>{if(e.target===e.currentTarget)setAddCatOpen(false);}}>
           <div className="sheet">
